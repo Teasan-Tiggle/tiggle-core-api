@@ -18,17 +18,19 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-        
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
 
       - name: Build jar
         run: ./gradlew clean bootJar -x test
@@ -40,8 +42,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Set TAG
-        run: echo "TAG=$(date +%Y%m%d%H%M)-${GITHUB_SHA::7}" >> $GITHUB_ENV
+      - name: Compute tag
+        id: meta
+        run: echo "tag=$(date +%Y%m%d%H%M)-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
       - name: Build & Push image
         uses: docker/build-push-action@v5
@@ -49,13 +52,16 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE }}:${{ env.TAG }}
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
             ${{ env.IMAGE }}:latest
 
   deploy:
     needs: build-and-push
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/teasan-tiggle/tiggle-core-api
+      TAG: ${{ needs.build-and-push.outputs.tag }}
     steps:
       - name: Deploy on EC2 (pull & up)
         uses: appleboy/ssh-action@v1.2.0
@@ -70,10 +76,15 @@ jobs:
 
             cd /srv/app
 
+            IMAGE_TAG="${TAG:-latest}"
             if [ -f .env ]; then
-              sed -i "s|^APP_IMAGE=.*|APP_IMAGE=${{ env.IMAGE }}:${{ env.TAG }}|" .env
+              if grep -q '^APP_IMAGE=' .env; then
+                sed -i "s|^APP_IMAGE=.*|APP_IMAGE=${IMAGE}:${IMAGE_TAG}|" .env
+              else
+                echo "APP_IMAGE=${IMAGE}:${IMAGE_TAG}" >> .env
+              fi
             else
-              echo "APP_IMAGE=${{ env.IMAGE }}:${{ env.TAG }}" >> .env
+              echo "APP_IMAGE=${IMAGE}:${IMAGE_TAG}" >> .env
             fi
 
             docker compose pull app || true
