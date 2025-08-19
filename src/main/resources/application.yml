@@ -6,3 +6,14 @@ spring:
 
 server:
   port: 8081
+
+# Swagger 설정
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method      # HTTP Method 순서대로 정렬
+    tags-sorter: alpha             # 태그 이름 순으로 정렬
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/jso
