@@ -2,6 +2,7 @@ package com.example.tiggle.controller.auth;
 
 import com.example.tiggle.dto.ResponseDto;
 import com.example.tiggle.dto.auth.EmailSendRequestDto;
+import com.example.tiggle.dto.auth.EmailVerifyRequestDto;
 import com.example.tiggle.service.auth.EmailAuthService;
 import com.example.tiggle.service.user.StudentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,5 +49,20 @@ public class EmailAuthController {
         emailAuthService.sendVerificationCode(requestDto.getEmail());
 
         return ResponseEntity.ok(new ResponseDto(true));
+    }
+
+    @PostMapping("/verify")
+    @Operation(summary = "이메일 인증 번호 검증", description = "입력한 이메일과 인증코드를 검증합니다.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "이메일 인증 결과 반환"),
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (이메일 또는 코드 누락)", content = @Content)
+    })
+    public ResponseEntity<ResponseDto> verifyCode(@Valid @RequestBody EmailVerifyRequestDto requestDto) {
+        boolean isVerified = emailAuthService.verifyCode(requestDto.getEmail(), requestDto.getCode());
+        if (isVerified) {
+            return ResponseEntity.ok(new ResponseDto(true));
+        } else {
+            return ResponseEntity.badRequest().body(new ResponseDto(false, "인증 코드가 유효하지 않습니다."));
+        }
     }
 }
