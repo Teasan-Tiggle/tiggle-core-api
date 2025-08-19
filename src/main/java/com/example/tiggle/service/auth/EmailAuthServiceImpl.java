@@ -49,6 +49,31 @@ public class EmailAuthServiceImpl implements EmailAuthService {
         mailService.sendEmail(email, title, content);
     }
 
+    @Override
+    public boolean verifyCode(String email, String userCode) {
+        VerificationInfo info = verificationStorage.get(email);
+
+        // 1. 해당 이메일로 발송된 기록 없음
+        if (info == null) {
+            return false;
+        }
+
+        // 2. 코드 만료
+        if (info.createdAt.plusMinutes(EXPIRATION_MINUTES).isBefore(LocalDateTime.now())) {
+            verificationStorage.remove(email);
+            return false;
+        }
+
+        // 3. 코드 일치
+        if (info.code.equals(userCode)) {
+            verificationStorage.remove(email);
+            return true;
+        }
+
+        // 4. 코드 불일치
+        return false;
+    }
+
     /**
      * 6자리 숫자 인증 코드를 생성
      */
