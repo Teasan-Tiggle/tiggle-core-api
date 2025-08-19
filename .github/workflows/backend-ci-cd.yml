@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE: ghcr.io/Teasan-Tiggle/tiggle-core-api
+  IMAGE: ghcr.io/teasan-tiggle/tiggle-core-api
 
 jobs:
   build-and-push:
@@ -51,7 +51,7 @@ jobs:
 
   deploy:
     needs: build-and-push
-    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy on EC2 (pull & up)
