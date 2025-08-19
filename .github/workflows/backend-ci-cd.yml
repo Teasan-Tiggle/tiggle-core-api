@@ -88,7 +88,6 @@ jobs:
               echo "APP_IMAGE=${IMAGE}:${IMAGE_TAG}" >> .env
             fi
 
-
             docker compose pull app || true
             docker compose up -d app
             docker image prune -f
