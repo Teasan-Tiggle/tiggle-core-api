@@ -26,4 +26,11 @@ public interface StudentService {
      * @return 회원가입 성공 여부
      */
     boolean joinUser(JoinRequestDto requestDto);
+
+    /**
+     * 로그인한다.
+     *
+     * @return 로그인 성공 여부
+     */
+    boolean loginUser(String email, String password);
 }
