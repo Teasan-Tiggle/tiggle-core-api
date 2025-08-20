@@ -2,6 +2,7 @@ package com.example.tiggle.controller.user;
 
 import com.example.tiggle.dto.ResponseDto;
 import com.example.tiggle.dto.user.JoinRequestDto;
+import com.example.tiggle.dto.user.LoginRequestDto;
 import com.example.tiggle.service.user.StudentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -49,6 +50,33 @@ public class UserController {
         } else {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new ResponseDto<Void>(false, "이미 가입된 이메일 또는 학번입니다."));
+        }
+    }
+
+    /**
+     * 로그인
+     *
+     * @param requestDto 로그인 정보
+     * @return 로그인 결과
+     */
+    @PostMapping("/login")
+    @Operation(summary = "로그인", description = "사용자 인증을 수행합니다.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "로그인 성공"),
+            @ApiResponse(responseCode = "400", description = "유효하지 않은 입력값"),
+            @ApiResponse(responseCode = "401", description = "인증 실패 (이메일 또는 비밀번호 불일치)")
+    })
+    public ResponseEntity<ResponseDto<Void>> login(
+            @Parameter(description = "로그인 정보 (JSON 형식)", required = true)
+            @Valid @RequestBody LoginRequestDto requestDto
+    ) {
+        boolean isAuthenticated = studentService.loginUser(requestDto.getEmail(), requestDto.getPassword());
+
+        if (isAuthenticated) {
+            return ResponseEntity.ok(new ResponseDto<Void>(true, "로그인 성공"));
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ResponseDto<Void>(false, "이메일 또는 비밀번호가 일치하지 않습니다."));
         }
     }
 }

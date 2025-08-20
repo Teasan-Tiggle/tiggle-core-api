@@ -59,4 +59,11 @@ public class StudentServiceImpl implements StudentService {
             return false;
         }
     }
+
+    @Override
+    public boolean loginUser(String email, String password) {
+        return studentRepository.findByEmail(email)
+                .map(foundStudent -> passwordEncoder.matches(password, foundStudent.getPassword()))
+                .orElse(false);
+    }
 }
