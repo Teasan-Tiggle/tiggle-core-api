@@ -18,8 +18,23 @@ spring:
   jackson:
     time-zone: Asia/Seoul
 
+  data:
+    redis:
+      host: redis
+      port: 6379
+
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
+sms:
+  api-key: ${SOLAPI_API_KEY}
+  api-secret: ${SOLAPI_API_SECRET}
+  from: ${SOLAPI_FROM}
+  base-url: ${SOLAPI_BASE_URL:https://api.solapi.com}
+  ttl-seconds: ${OTP_TTL_SECONDS:180}
+  resend-interval-seconds: ${OTP_RESEND_SECONDS:60}
+  max-attempts: ${OTP_MAX_ATTEMPTS:5}
+  mock: ${SMS_MOCK:false}
