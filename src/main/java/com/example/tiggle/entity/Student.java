@@ -1,10 +1,16 @@
 package com.example.tiggle.entity;
 
 import jakarta.persistence.*;
-
-import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Student {
 
     @Id
@@ -18,12 +24,6 @@ public class Student {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "university_id", nullable = false)
-    private Integer universityId;
-
-    @Column(name = "department_id", nullable = false)
-    private Integer department_id;
-
     @Column(name = "student_id", nullable = false)
     private String studentId;
 
@@ -33,9 +33,11 @@ public class Student {
     @Column(name = "phone")
     private String phone;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_id", nullable = false)
+    private University university;
 
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id", nullable = false)
+    private Department department;
 }
