@@ -6,3 +6,5 @@ out
 **/*.iml
 **/.idea
 README.md
+
+!build/libs/*.jar
