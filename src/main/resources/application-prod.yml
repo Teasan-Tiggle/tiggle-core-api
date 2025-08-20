@@ -30,10 +30,10 @@ management:
         include: health,info
 
 sms:
-  api-key: ${SOLAPI_API_KEY}
-  api-secret: ${SOLAPI_API_SECRET}
-  from: ${SOLAPI_FROM}
-  base-url: ${SOLAPI_BASE_URL:https://api.solapi.com}
+  api-key: ${COOLSMS_API_KEY}
+  api-secret: ${COOLSMS_API_SECRET}
+  from: ${COOLSMS_FROM}
+  base-url: ${COOLSMS_BASE_URL:https://api.solapi.com}
   ttl-seconds: ${OTP_TTL_SECONDS:180}
   resend-interval-seconds: ${OTP_RESEND_SECONDS:60}
   max-attempts: ${OTP_MAX_ATTEMPTS:5}
