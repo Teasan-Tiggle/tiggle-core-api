@@ -40,6 +40,9 @@ dependencies {
 
     // Email Verification
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // Spring Security for password hashing
+    implementation 'org.springframework.boot:spring-boot-starter-security'
 }
 
 tasks.named('test') {
