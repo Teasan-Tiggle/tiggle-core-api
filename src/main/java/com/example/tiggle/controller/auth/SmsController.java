@@ -1,4 +1,4 @@
-package com.example.tiggle.controller.sms;
+package com.example.tiggle.controller.auth;
 
 import com.example.tiggle.dto.ResponseDto;
 import com.example.tiggle.service.SmsService;
@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @Validated
 @RestController
-@RequestMapping("/auth/sms")
+@RequestMapping("/api/auth/sms")
 public class SmsController {
 
     private record SendReq(@NotBlank String phone, String purpose) {}
