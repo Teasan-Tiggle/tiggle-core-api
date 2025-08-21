@@ -1,13 +1,30 @@
-server:
-  port: ${SERVER_PORT:8081}
-  forward-headers-strategy: native
-
 spring:
+  jackson:
+    time-zone: Asia/Seoul
+  
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    auth-code-expiration-millis: ${MAIL_AUTH_CODE_EXPIRATION:1800000}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+            required: ${MAIL_SMTP_STARTTLS_REQUIRED:true}
+          connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT:5000}
+          timeout: ${MAIL_SMTP_TIMEOUT:5000}
+          writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT:5000}
+  
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  
   jpa:
     open-in-view: false
     hibernate:
@@ -15,20 +32,34 @@ spring:
     properties:
       hibernate:
         format_sql: true
-  jackson:
-    time-zone: Asia/Seoul
-
+  
   data:
     redis:
       host: redis
       port: 6379
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
+server:
+  port: ${SERVER_PORT:8081}
+  url: ${SERVER_URL}
+  forward-headers-strategy: native
 
+# Swagger 설정
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method      # HTTP Method 순서대로 정렬
+    tags-sorter: alpha             # 태그 이름 순으로 정렬
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json
+
+# Mail 설정
+mail:
+  username: ${MAIL_USERNAME}
+  password: ${MAIL_PASSWORD}
+
+# SMS 설정
 sms:
   api-key: ${COOLSMS_API_KEY}
   api-secret: ${COOLSMS_API_SECRET}
@@ -38,3 +69,16 @@ sms:
   resend-interval-seconds: ${OTP_RESEND_SECONDS:60}
   max-attempts: ${OTP_MAX_ATTEMPTS:5}
   mock: ${SMS_MOCK:false}
+
+# External API 설정
+external-api:
+  ssafy:
+    base-url: ${SSAFY_API_BASE_URL}
+    api-key: ${SSAFY_API_KEY}
+
+# Management 설정
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
