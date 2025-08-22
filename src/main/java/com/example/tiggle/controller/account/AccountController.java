@@ -24,7 +24,7 @@ public class AccountController {
     private final AccountService accountService;
     
     @Operation(summary = "1원 송금 요청", description = "계좌번호로 1원 송금을 통한 계좌 인증을 수행합니다")
-    @PostMapping("/transfer-verification")
+    @PostMapping("/verification")
     public Mono<OneWonVerificationResponse> sendOneWonVerification(
             @Parameter(description = "암호화된 사용자 키", required = true)
             @RequestHeader("encryptedUserKey") String encryptedUserKey,
@@ -34,7 +34,7 @@ public class AccountController {
     }
     
     @Operation(summary = "1원 송금 인증 코드 검증", description = "1원 송금으로 받은 인증 코드를 검증하고 검증 토큰을 발급합니다")
-    @PostMapping("/transfer-confirmation")
+    @PostMapping("/verification/check")
     public Mono<OneWonVerificationValidateResponse> validateOneWonAuth(
             @Parameter(description = "암호화된 사용자 키", required = true)
             @RequestHeader("encryptedUserKey") String encryptedUserKey,
