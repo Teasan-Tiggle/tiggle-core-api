@@ -22,6 +22,7 @@ public class FinancialApiEndpoints {
     public static final String INQUIRE_TRANSACTION_HISTORY_LIST = "/inquireTransactionHistoryList"; // 계좌 거래 내역 조회
     public static final String INQUIRE_TRANSACTION_HISTORY = "/inquireTransactionHistory"; // 계좌 거래 내역 조회(단건)
     public static final String DELETE_DEMAND_DEPOSIT_ACCOUNT = "/deleteDemandDepositAccount"; // 계좌 해지
+    public static final String INQUIRE_DEMAND_DEPOSIT_ACCOUNT_HOLDER_NAME = "/inquireDemandDepositAccountHolderName"; // 예금주 조회
     
     // Account Auth endpoints
     public static final String OPEN_ACCOUNT_AUTH = "/openAccountAuth"; // 1원 송금(계좌 인증)
