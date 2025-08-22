@@ -1,6 +1,6 @@
 package com.example.tiggle.dto;
 
-import lombok.AllArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @Builder
 @NoArgsConstructor
-@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ResponseDto<T> {
 
     private Boolean result;
@@ -19,8 +19,19 @@ public class ResponseDto<T> {
         this.result = result;
     }
 
+    public ResponseDto(Boolean result, T data) {
+        this.result = result;
+        this.data = data;
+    }
+
     public ResponseDto(Boolean result, String message) {
         this.result = result;
+        this.message = message;
+    }
+
+    public ResponseDto(Boolean result, T data, String message) {
+        this.result = result;
+        this.data = data;
         this.message = message;
     }
 }

@@ -2,6 +2,8 @@ package com.example.tiggle.service.user;
 
 import com.example.tiggle.dto.user.JoinRequestDto;
 
+import java.util.Map;
+
 public interface StudentService {
     /**
      * 중복 이메일 여부를 체크한다.
@@ -30,7 +32,7 @@ public interface StudentService {
     /**
      * 로그인한다.
      *
-     * @return 로그인 성공 여부
+     * @return 로그인 성공 시 userId(int)와 userKey(String)를 담은 Map, 실패 시 예외 발생
      */
-    boolean loginUser(String email, String password);
+    Map<String, Object> loginUser(String email, String password);
 }
