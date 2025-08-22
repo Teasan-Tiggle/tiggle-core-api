@@ -33,6 +33,12 @@ public class Student {
     @Column(name = "phone")
     private String phone;
 
+    @Column(name = "primary_account_no", unique = true)
+    private String primaryAccountNo;
+
+    @Column(name = "user_key", unique = true)
+    private String userKey;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id", nullable = false)
     private University university;
