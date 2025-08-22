@@ -1,24 +1,13 @@
 package com.example.tiggle.service.finopenapi;
 
 import com.example.tiggle.constants.FinancialApiEndpoints;
-import com.example.tiggle.dto.finopenapi.request.CheckAuthCodeRequest;
-import com.example.tiggle.dto.finopenapi.request.CreateDemandDepositAccountRequest;
-import com.example.tiggle.dto.finopenapi.request.UserRequest;
-import com.example.tiggle.dto.finopenapi.request.DeleteDemandDepositAccountRequest;
-import com.example.tiggle.dto.finopenapi.request.InquireDemandDepositAccountBalanceRequest;
-import com.example.tiggle.dto.finopenapi.request.InquireDemandDepositAccountListRequest;
-import com.example.tiggle.dto.finopenapi.request.InquireDemandDepositAccountRequest;
-import com.example.tiggle.dto.finopenapi.request.InquireTransactionHistoryListRequest;
-import com.example.tiggle.dto.finopenapi.request.InquireTransactionHistoryRequest;
-import com.example.tiggle.dto.finopenapi.request.OpenAccountAuthRequest;
-import com.example.tiggle.dto.finopenapi.request.UpdateDemandDepositAccountDepositRequest;
-import com.example.tiggle.dto.finopenapi.request.UpdateDemandDepositAccountTransferRequest;
-import com.example.tiggle.dto.finopenapi.request.UpdateDemandDepositAccountWithdrawalRequest;
+import com.example.tiggle.dto.finopenapi.request.*;
 import com.example.tiggle.dto.finopenapi.response.CheckAuthCodeResponse;
 import com.example.tiggle.dto.finopenapi.response.CreateDemandDepositAccountResponse;
 import com.example.tiggle.dto.finopenapi.response.UserResponse;
 import com.example.tiggle.dto.finopenapi.response.DeleteDemandDepositAccountResponse;
 import com.example.tiggle.dto.finopenapi.response.InquireDemandDepositAccountBalanceResponse;
+import com.example.tiggle.dto.finopenapi.response.InquireDemandDepositAccountHolderNameResponse;
 import com.example.tiggle.dto.finopenapi.response.InquireDemandDepositAccountListResponse;
 import com.example.tiggle.dto.finopenapi.response.InquireDemandDepositAccountResponse;
 import com.example.tiggle.dto.finopenapi.response.InquireTransactionHistoryListResponse;
@@ -27,13 +16,14 @@ import com.example.tiggle.dto.finopenapi.response.OpenAccountAuthResponse;
 import com.example.tiggle.dto.finopenapi.response.UpdateDemandDepositAccountDepositResponse;
 import com.example.tiggle.dto.finopenapi.response.UpdateDemandDepositAccountTransferResponse;
 import com.example.tiggle.dto.finopenapi.response.UpdateDemandDepositAccountWithdrawalResponse;
-import com.example.tiggle.util.FinancialApiHeaderUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+
+import static com.example.tiggle.util.FinancialApiHeaderUtil.createHeader;
 
 @Slf4j
 @Service
@@ -81,7 +71,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<CreateDemandDepositAccountResponse> createDemandDepositAccount(String userKey) {
         CreateDemandDepositAccountRequest request = CreateDemandDepositAccountRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("createDemandDepositAccount", apiKey, userKey))
+                .header(createHeader("createDemandDepositAccount", apiKey, userKey))
                 .accountTypeUniqueNo("088-1-ab66fb75b86349")
                 .build();
 
@@ -97,7 +87,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<InquireDemandDepositAccountListResponse> inquireDemandDepositAccountList(String userKey) {
         InquireDemandDepositAccountListRequest request = InquireDemandDepositAccountListRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("inquireDemandDepositAccountList", apiKey, userKey))
+                .header(createHeader("inquireDemandDepositAccountList", apiKey, userKey))
                 .build();
 
         return ssafyFinApiWebClient
@@ -112,7 +102,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<InquireDemandDepositAccountResponse> inquireDemandDepositAccount(String userKey, String accountNo) {
         InquireDemandDepositAccountRequest request = InquireDemandDepositAccountRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("inquireDemandDepositAccount", apiKey, userKey))
+                .header(createHeader("inquireDemandDepositAccount", apiKey, userKey))
                 .accountNo(accountNo)
                 .build();
 
@@ -128,7 +118,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<InquireDemandDepositAccountBalanceResponse> inquireDemandDepositAccountBalance(String userKey, String accountNo) {
         InquireDemandDepositAccountBalanceRequest request = InquireDemandDepositAccountBalanceRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("inquireDemandDepositAccountBalance", apiKey, userKey))
+                .header(createHeader("inquireDemandDepositAccountBalance", apiKey, userKey))
                 .accountNo(accountNo)
                 .build();
 
@@ -144,7 +134,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<UpdateDemandDepositAccountDepositResponse> updateDemandDepositAccountDeposit(String userKey, String accountNo, String transactionBalance, String transactionSummary) {
         UpdateDemandDepositAccountDepositRequest request = UpdateDemandDepositAccountDepositRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("updateDemandDepositAccountDeposit", apiKey, userKey))
+                .header(createHeader("updateDemandDepositAccountDeposit", apiKey, userKey))
                 .accountNo(accountNo)
                 .transactionBalance(transactionBalance)
                 .transactionSummary(transactionSummary)
@@ -162,7 +152,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<UpdateDemandDepositAccountWithdrawalResponse> updateDemandDepositAccountWithdrawal(String userKey, String accountNo, String transactionBalance, String transactionSummary) {
         UpdateDemandDepositAccountWithdrawalRequest request = UpdateDemandDepositAccountWithdrawalRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("updateDemandDepositAccountWithdrawal", apiKey, userKey))
+                .header(createHeader("updateDemandDepositAccountWithdrawal", apiKey, userKey))
                 .accountNo(accountNo)
                 .transactionBalance(transactionBalance)
                 .transactionSummary(transactionSummary)
@@ -180,7 +170,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<UpdateDemandDepositAccountTransferResponse> updateDemandDepositAccountTransfer(String userKey, String depositAccountNo, String depositTransactionSummary, String transactionBalance, String withdrawalAccountNo, String withdrawalTransactionSummary) {
         UpdateDemandDepositAccountTransferRequest request = UpdateDemandDepositAccountTransferRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("updateDemandDepositAccountTransfer", apiKey, userKey))
+                .header(createHeader("updateDemandDepositAccountTransfer", apiKey, userKey))
                 .depositAccountNo(depositAccountNo)
                 .depositTransactionSummary(depositTransactionSummary)
                 .transactionBalance(transactionBalance)
@@ -200,7 +190,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<InquireTransactionHistoryListResponse> inquireTransactionHistoryList(String userKey, String accountNo, String startDate, String endDate, String transactionType, String orderByType) {
         InquireTransactionHistoryListRequest request = InquireTransactionHistoryListRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("inquireTransactionHistoryList", apiKey, userKey))
+                .header(createHeader("inquireTransactionHistoryList", apiKey, userKey))
                 .accountNo(accountNo)
                 .startDate(startDate)
                 .endDate(endDate)
@@ -220,7 +210,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<InquireTransactionHistoryResponse> inquireTransactionHistory(String userKey, String accountNo, String transactionUniqueNo) {
         InquireTransactionHistoryRequest request = InquireTransactionHistoryRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("inquireTransactionHistory", apiKey, userKey))
+                .header(createHeader("inquireTransactionHistory", apiKey, userKey))
                 .accountNo(accountNo)
                 .transactionUniqueNo(transactionUniqueNo)
                 .build();
@@ -237,7 +227,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<DeleteDemandDepositAccountResponse> deleteDemandDepositAccount(String userKey, String accountNo) {
         DeleteDemandDepositAccountRequest request = DeleteDemandDepositAccountRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("deleteDemandDepositAccount", apiKey, userKey))
+                .header(createHeader("deleteDemandDepositAccount", apiKey, userKey))
                 .accountNo(accountNo)
                 .build();
 
@@ -253,7 +243,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<OpenAccountAuthResponse> openAccountAuth(String userKey, String accountNo, String authText) {
         OpenAccountAuthRequest request = OpenAccountAuthRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("openAccountAuth", apiKey, userKey))
+                .header(createHeader("openAccountAuth", apiKey, userKey))
                 .accountNo(accountNo)
                 .authText(authText)
                 .build();
@@ -270,7 +260,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     @Override
     public Mono<CheckAuthCodeResponse> checkAuthCode(String userKey, String accountNo, String authText, String authCode) {
         CheckAuthCodeRequest request = CheckAuthCodeRequest.builder()
-                .header(FinancialApiHeaderUtil.createHeader("checkAuthCode", apiKey, userKey))
+                .header(createHeader("checkAuthCode", apiKey, userKey))
                 .accountNo(accountNo)
                 .authText(authText)
                 .authCode(authCode)
@@ -282,5 +272,21 @@ public class FinancialApiServiceImpl implements FinancialApiService {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(CheckAuthCodeResponse.class);
+    }
+
+    // 예금주 조회
+    @Override
+    public Mono<InquireDemandDepositAccountHolderNameResponse> inquireDemandDepositAccountHolderName(String userKey, String accountNo) {
+        InquireDemandDepositAccountHolderNameRequest request = InquireDemandDepositAccountHolderNameRequest.builder()
+                .header(createHeader("inquireDemandDepositAccountHolderName", apiKey, userKey))
+                .accountNo(accountNo)
+                .build();
+
+        return ssafyFinApiWebClient
+                .post()
+                .uri(FinancialApiEndpoints.DEMAND_DEPOSIT_BASE + FinancialApiEndpoints.INQUIRE_DEMAND_DEPOSIT_ACCOUNT_HOLDER_NAME)
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(InquireDemandDepositAccountHolderNameResponse.class);
     }
 }

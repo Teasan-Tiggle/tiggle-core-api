@@ -1,18 +1,6 @@
 package com.example.tiggle.service.finopenapi;
 
-import com.example.tiggle.dto.finopenapi.response.CheckAuthCodeResponse;
-import com.example.tiggle.dto.finopenapi.response.CreateDemandDepositAccountResponse;
-import com.example.tiggle.dto.finopenapi.response.UserResponse;
-import com.example.tiggle.dto.finopenapi.response.DeleteDemandDepositAccountResponse;
-import com.example.tiggle.dto.finopenapi.response.InquireDemandDepositAccountBalanceResponse;
-import com.example.tiggle.dto.finopenapi.response.InquireDemandDepositAccountListResponse;
-import com.example.tiggle.dto.finopenapi.response.InquireDemandDepositAccountResponse;
-import com.example.tiggle.dto.finopenapi.response.InquireTransactionHistoryListResponse;
-import com.example.tiggle.dto.finopenapi.response.InquireTransactionHistoryResponse;
-import com.example.tiggle.dto.finopenapi.response.OpenAccountAuthResponse;
-import com.example.tiggle.dto.finopenapi.response.UpdateDemandDepositAccountDepositResponse;
-import com.example.tiggle.dto.finopenapi.response.UpdateDemandDepositAccountTransferResponse;
-import com.example.tiggle.dto.finopenapi.response.UpdateDemandDepositAccountWithdrawalResponse;
+import com.example.tiggle.dto.finopenapi.response.*;
 import reactor.core.publisher.Mono;
 
 public interface FinancialApiService {
@@ -58,4 +46,7 @@ public interface FinancialApiService {
     
     // 1원 송금 인증 검증
     Mono<CheckAuthCodeResponse> checkAuthCode(String userKey, String accountNo, String authText, String authCode);
+
+    // 예금주 조회
+    Mono<InquireDemandDepositAccountHolderNameResponse> inquireDemandDepositAccountHolderName(String userKey, String accountNo);
 }

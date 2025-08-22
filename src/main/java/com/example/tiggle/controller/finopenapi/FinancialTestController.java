@@ -139,4 +139,12 @@ public class FinancialTestController {
             @RequestParam String authCode) {
         return financialApiService.checkAuthCode(userKey, accountNo, authText, authCode);
     }
+    
+    @Operation(summary = "계좌 소유자명 조회", description = "계좌의 소유자명을 조회합니다")
+    @GetMapping("/account/holder")
+    public Mono<InquireDemandDepositAccountHolderNameResponse> getAccountHolderName(
+            @RequestParam String userKey,
+            @RequestParam String accountNo) {
+        return financialApiService.inquireDemandDepositAccountHolderName(userKey, accountNo);
+    }
 }
