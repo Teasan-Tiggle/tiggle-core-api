@@ -42,7 +42,7 @@ public class JwtTokenProvider {
 
     public Claims getClaimsFromToken(String token) {
         try {
-            return Jwts.parser().setSigningKey(key).build().parseClaimsJws(token).getBody();
+            return Jwts.parser().verifyWith((javax.crypto.SecretKey) key).build().parseClaimsJws(token).getBody();
         } catch (ExpiredJwtException ex) {
             throw new UserAuthException("JWT_EXPIRED", "토큰이 만료되었습니다.");
         } catch (UnsupportedJwtException ex) {
