@@ -37,7 +37,6 @@ public class PiggyServiceImpl implements PiggyService {
     }
 
     @Override
-    @Transactional
     public Mono<ApiResponse<PiggyBankResponse>> updateSettings(Integer userId, UpdatePiggySettingsRequest req) {
         return Mono.fromCallable(() -> {
             PiggyBank piggy = getOrCreatePiggy(userId);
@@ -57,45 +56,44 @@ public class PiggyServiceImpl implements PiggyService {
                 }
             }
 
-            PiggyBank saved = piggyBankRepository.save(piggy);
-            return ApiResponse.success(toResponse(saved));
+            piggyBankRepository.save(piggy);
+
+            PiggyBank reloaded = piggyBankRepository.findByOwner_Id(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("저금통을 찾을 수 없습니다."));
+            return ApiResponse.success(toResponse(reloaded));
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
     @Override
-    public Mono<ApiResponse<List<EsgCategoryDto>>> listCategories() {
-        return Mono.fromCallable(() ->
-                        esgCategoryRepository.findAll().stream().map(this::toDto).toList()
-                ).map(ApiResponse::success)
-                .subscribeOn(Schedulers.boundedElastic());
-    }
-
-    @Override
-    @Transactional
     public Mono<ApiResponse<PiggyBankResponse>> setCategory(Integer userId, Long categoryId) {
         return Mono.fromCallable(() -> {
             PiggyBank piggy = getOrCreatePiggy(userId);
             EsgCategory cat = esgCategoryRepository.findById(categoryId)
                     .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 ESG 카테고리입니다."));
             piggy.setEsgCategory(cat);
-            piggy = piggyBankRepository.save(piggy);
-            return ApiResponse.success(toResponse(piggy));
+            piggyBankRepository.save(piggy);
+
+            PiggyBank reloaded = piggyBankRepository.findByOwner_Id(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("저금통을 찾을 수 없습니다."));
+            return ApiResponse.success(toResponse(reloaded));
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
     @Override
-    @Transactional
     public Mono<ApiResponse<PiggyBankResponse>> unsetCategory(Integer userId) {
         return Mono.fromCallable(() -> {
             PiggyBank piggy = getOrCreatePiggy(userId);
             piggy.setEsgCategory(null);
-            piggy = piggyBankRepository.save(piggy);
-            return ApiResponse.success(toResponse(piggy));
+            piggyBankRepository.save(piggy);
+
+            PiggyBank reloaded = piggyBankRepository.findByOwner_Id(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("저금통을 찾을 수 없습니다."));
+            return ApiResponse.success(toResponse(reloaded));
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-
     private PiggyBank getOrCreatePiggy(Integer userId) {
+        // ★ EntityGraph가 붙은 메서드 사용 → 카테고리 로딩됨
         return piggyBankRepository.findByOwner_Id(userId).orElseGet(() -> {
             Student owner = studentRepository.findById(userId)
                     .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));

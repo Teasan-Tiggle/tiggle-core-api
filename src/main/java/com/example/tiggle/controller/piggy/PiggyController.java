@@ -1,9 +1,10 @@
 package com.example.tiggle.controller.piggy;
 
 import com.example.tiggle.dto.common.ApiResponse;
+import com.example.tiggle.dto.piggy.request.PiggyEntriesPageRequest;
+import com.example.tiggle.dto.piggy.response.PiggyEntriesPageResponse;
 import com.example.tiggle.dto.piggy.request.CreatePiggyBankRequest;
 import com.example.tiggle.dto.piggy.request.UpdatePiggySettingsRequest;
-import com.example.tiggle.dto.piggy.response.EsgCategoryDto;
 import com.example.tiggle.dto.piggy.response.PiggyBankResponse;
 import com.example.tiggle.dto.piggy.response.PiggySummaryResponse;
 import com.example.tiggle.service.piggy.PiggyCreationService;
@@ -48,12 +49,6 @@ public class PiggyController {
         return piggySettingsService.updateSettings(userId, request);
     }
 
-    @Operation(summary = "ESG 카테고리 목록")
-    @GetMapping("/categories")
-    public Mono<ApiResponse<List<EsgCategoryDto>>> listCategories() {
-        return piggySettingsService.listCategories();
-    }
-
     @Operation(summary = "ESG 카테고리 설정")
     @PutMapping("/category/{categoryId}")
     public Mono<ApiResponse<PiggyBankResponse>> setCategory(
@@ -94,5 +89,15 @@ public class PiggyController {
             @Valid @RequestBody CreatePiggyBankRequest request
     ) {
         return piggyCreationService.create(encryptedUserKey, userId, request);
+    }
+
+    @Operation(summary = "저금통 내역 조회(커서 페이지네이션)")
+    @PostMapping("/detail/entries")
+    public Mono<ApiResponse<PiggyEntriesPageResponse>> getEntriesPage(
+            @RequestHeader("encryptedUserKey") String encryptedUserKey,
+            @RequestHeader("userId") Integer userId,
+            @RequestBody PiggyEntriesPageRequest request
+    ) {
+        return piggySummaryService.getEntriesPage(encryptedUserKey, userId, request);
     }
 }
