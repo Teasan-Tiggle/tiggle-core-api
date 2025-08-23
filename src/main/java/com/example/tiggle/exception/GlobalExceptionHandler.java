@@ -1,7 +1,7 @@
 package com.example.tiggle.exception;
 
 import com.example.tiggle.exception.auth.MailSendException;
-import com.example.tiggle.exception.user.UserAuthException;
+import com.example.tiggle.exception.auth.AuthException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -34,8 +34,8 @@ public class GlobalExceptionHandler {
     /**
      * 유저 인증 관련 예외 처리
      */
-    @ExceptionHandler(UserAuthException.class)
-    public ResponseEntity<ErrorResponse> handleUserAuthException(UserAuthException e) {
+    @ExceptionHandler(AuthException.class)
+    public ResponseEntity<ErrorResponse> handleUserAuthException(AuthException e) {
 
         logger.error("사용자 인증/인가 오류: {} (코드: {})", e.getMessage(), e.getErrorCode(), e);
 

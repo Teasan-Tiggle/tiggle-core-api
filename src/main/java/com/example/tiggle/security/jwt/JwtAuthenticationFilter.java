@@ -1,6 +1,6 @@
 package com.example.tiggle.security.jwt;
 
-import com.example.tiggle.exception.user.UserAuthException;
+import com.example.tiggle.exception.auth.AuthException;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -48,7 +48,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
-        } catch (UserAuthException ex) {
+        } catch (AuthException ex) {
             // JWT 관련 예외 발생 시, SecurityContextHolder를 비우고 응답 상태 설정
             SecurityContextHolder.clearContext();
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, ex.getMessage());
