@@ -33,7 +33,7 @@ public class EmailAuthController {
      *
      * @return 전송 결과
      */
-    @PostMapping("/send/signup")
+    @PostMapping("/send")
     @Operation(summary = "이메일 인증코드 전송", description = "입력한 이메일 주소로 인증코드를 전송합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "인증 번호 전송 결과 반환"),
@@ -46,9 +46,6 @@ public class EmailAuthController {
 
         if (requestDto.getEmail() == null)
             return ResponseEntity.badRequest().build();
-
-        if (studentService.checkDuplicateEmail(requestDto.getEmail()))
-            return ResponseEntity.ok(new ResponseDto<Void>(false, "이미 가입된 이메일입니다."));
 
         emailAuthService.sendVerificationCode(requestDto.getEmail());
 

@@ -138,7 +138,7 @@ public class AuthController {
         return ResponseEntity.ok().headers(headers).body(new ResponseDto<>(true));
     }
 
-    @PostMapping("/refresh")
+    @PostMapping("/reissue")
     @Operation(summary = "액세스 토큰 재발급", description = "리프레시 토큰을 사용하여 새로운 액세스 토큰을 발급합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "액세스 토큰 재발급 성공"),
