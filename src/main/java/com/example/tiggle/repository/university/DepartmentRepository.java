@@ -1,4 +1,4 @@
-package com.example.tiggle.repository.user;
+package com.example.tiggle.repository.university;
 
 import com.example.tiggle.entity.Department;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -1,7 +1,7 @@
 package com.example.tiggle.exception;
 
-import com.example.tiggle.exception.auth.MailSendException;
 import com.example.tiggle.exception.auth.AuthException;
+import com.example.tiggle.exception.auth.MailSendException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.stream.Collectors;
 
@@ -53,7 +54,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 잘못된 요청
+     * 잘못된 요청 : 요청 본문 검증 실패 시
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException e) {
@@ -65,6 +66,19 @@ public class GlobalExceptionHandler {
         ErrorResponse response = new ErrorResponse(false, errorMessage);
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
+
+    /**
+     * 잘못된 요청 : 요청 파라미터 타입 변환 실패 시
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        String errorMessage = String.format("파라미터 '%s'의 값 '%s'를(을) %s 타입으로 변환할 수 없습니다.",
+                e.getName(), e.getValue(), e.getRequiredType().getSimpleName());
+
+        ErrorResponse response = new ErrorResponse(false, errorMessage);
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
 
     /**
      * 예상치 못한 서버 오류
