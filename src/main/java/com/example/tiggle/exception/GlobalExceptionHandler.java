@@ -1,6 +1,7 @@
 package com.example.tiggle.exception;
 
 import com.example.tiggle.exception.auth.MailSendException;
+import com.example.tiggle.exception.user.UserAuthException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -28,6 +29,27 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMailSendException(MailSendException e) {
         ErrorResponse response = new ErrorResponse(false, e.getMessage());
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * 유저 인증 관련 예외 처리
+     */
+    @ExceptionHandler(UserAuthException.class)
+    public ResponseEntity<ErrorResponse> handleUserAuthException(UserAuthException e) {
+
+        logger.error("사용자 인증/인가 오류: {} (코드: {})", e.getMessage(), e.getErrorCode(), e);
+
+        HttpStatus status = switch (e.getErrorCode()) {
+            case "USER_NOT_FOUND", "PASSWORD_MISMATCH" -> HttpStatus.UNAUTHORIZED;
+            case "DUPLICATE_EMAIL", "DUPLICATE_STUDENT_ID" -> HttpStatus.CONFLICT;
+            case "UNIVERSITY_NOT_FOUND", "DEPARTMENT_NOT_FOUND" -> HttpStatus.BAD_REQUEST;
+            case "EXTERNAL_API_FAILURE", "EXTERNAL_API_USER_CREATION_FAILURE", "EXTERNAL_API_USER_NOT_FOUND" -> HttpStatus.INTERNAL_SERVER_ERROR;
+            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
+
+        ErrorResponse response = new ErrorResponse(false, e.getMessage());
+
+        return new ResponseEntity<>(response, status);
     }
 
     /**

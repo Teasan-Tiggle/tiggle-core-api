@@ -49,7 +49,7 @@ public class StudentServiceImpl implements StudentService {
     @Transactional
     public boolean joinUser(JoinRequestDto requestDto) {
 
-        // 1. 우리 DB 중복 체크
+        // 1. DB 중복 체크
         if (checkDuplicateEmail(requestDto.getEmail())) {
             throw UserAuthException.duplicateEmail();
         }
@@ -108,7 +108,7 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public Map<String, Object> loginUser(String email, String password) {
-        // 1. 우리 DB에서 사용자 찾기
+        // 1. DB에서 사용자 찾기
         Student student = studentRepository.findByEmail(email)
                 .orElseThrow(UserAuthException::userNotFound);
 
