@@ -64,6 +64,35 @@ public class AccountVerificationTokenServiceImpl implements AccountVerificationT
     }
     
     @Override
+    @Transactional(readOnly = true)
+    public boolean validateTokenForAccount(String token, String accountNo) {
+        Optional<AccountVerificationToken> tokenEntity = tokenRepository.findByVerificationToken(token);
+        
+        if (tokenEntity.isEmpty()) {
+            log.warn("존재하지 않는 토큰: {}", token);
+            return false;
+        }
+        
+        AccountVerificationToken verificationToken = tokenEntity.get();
+        
+        // 토큰이 유효한지 확인
+        if (!verificationToken.isValid()) {
+            log.warn("유효하지 않은 토큰 - 토큰: {}, 사용여부: {}, 만료여부: {}", 
+                    token, verificationToken.getUsed(), verificationToken.isExpired());
+            return false;
+        }
+        
+        // 토큰의 계좌번호와 요청된 계좌번호가 일치하는지 확인
+        if (!accountNo.equals(verificationToken.getAccountNo())) {
+            log.warn("토큰의 계좌번호와 요청 계좌번호 불일치 - 토큰 계좌: {}, 요청 계좌: {}", 
+                    verificationToken.getAccountNo(), accountNo);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    @Override
     public void markTokenAsUsed(String token) {
         tokenRepository.markTokenAsUsed(token);
         log.info("토큰 사용 처리 완료: {}", token);

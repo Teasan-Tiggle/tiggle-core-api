@@ -8,6 +8,8 @@ public interface AccountVerificationTokenService {
     
     boolean validateToken(String token);
     
+    boolean validateTokenForAccount(String token, String accountNo);
+    
     void markTokenAsUsed(String token);
     
     void cleanupExpiredTokens();
