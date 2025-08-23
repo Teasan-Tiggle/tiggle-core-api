@@ -9,6 +9,7 @@ import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.account.AccountService;
 import com.example.tiggle.service.account.AccountVerificationTokenService;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
+import com.example.tiggle.service.security.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,10 +23,13 @@ public class AccountServiceImpl implements AccountService {
     private final FinancialApiService financialApiService;
     private final AccountVerificationTokenService tokenService;
     private final StudentRepository studentRepository;
+    private final EncryptionService encryptionService;
     
     @Override
     public Mono<OneWonVerificationResponse> sendOneWonVerification(String encryptedUserKey, String accountNo) {
-        return financialApiService.openAccountAuth(encryptedUserKey, accountNo, "계좌인증")
+        String userKey = encryptionService.decrypt(encryptedUserKey);
+        
+        return financialApiService.openAccountAuth(userKey, accountNo, "티끌")
                 .map(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
                         return OneWonVerificationResponse.success();
@@ -44,7 +48,8 @@ public class AccountServiceImpl implements AccountService {
     
     @Override
     public Mono<OneWonVerificationValidateResponse> validateOneWonAuth(String encryptedUserKey, String accountNo, String authCode, Integer userId) {
-        return financialApiService.checkAuthCode(encryptedUserKey, accountNo, "계좌인증", authCode)
+        String userKey = encryptionService.decrypt(encryptedUserKey);
+        return financialApiService.checkAuthCode(userKey, accountNo, "티끌", authCode)
                 .map(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
                         Student student = studentRepository.findById(userId)
@@ -67,8 +72,8 @@ public class AccountServiceImpl implements AccountService {
     @Override
     public Mono<ApiResponse<Void>> registerPrimaryAccount(String accountNo, String verificationToken, Integer userId) {
         return Mono.fromCallable(() -> {
-            if (!tokenService.validateToken(verificationToken)) {
-                return ApiResponse.<Void>failure("유효하지 않은 검증 토큰입니다.");
+            if (!tokenService.validateTokenForAccount(verificationToken, accountNo)) {
+                return ApiResponse.<Void>failure("유효하지 않은 검증 토큰이거나 계좌번호가 일치하지 않습니다.");
             }
             
             Student student = studentRepository.findById(userId)
@@ -96,8 +101,9 @@ public class AccountServiceImpl implements AccountService {
             
             return student.getPrimaryAccountNo();
         })
-        .flatMap(accountNo -> 
-            financialApiService.inquireDemandDepositAccount(encryptedUserKey, accountNo)
+        .flatMap(accountNo -> {
+            String userKey = encryptionService.decrypt(encryptedUserKey);
+            return financialApiService.inquireDemandDepositAccount(userKey, accountNo)
                 .map(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
                         PrimaryAccountInfoDto accountInfo = new PrimaryAccountInfoDto(
@@ -112,8 +118,8 @@ public class AccountServiceImpl implements AccountService {
                                 : "계좌 조회 중 오류가 발생했습니다.";
                         return ApiResponse.<PrimaryAccountInfoDto>failure(errorMessage);
                     }
-                })
-        )
+                });
+        })
         .onErrorResume(throwable -> {
             log.error("주 계좌 조회 중 오류 발생", throwable);
             String errorMessage = "등록된 주 계좌가 없습니다.".equals(throwable.getMessage()) 
