@@ -19,18 +19,12 @@ public class SwaggerConfig {
                         .description("'태산' 같은 변화를 만드는 금융 소셜 플랫폼 '티끌' API 문서")
                         .version("v0.1.0"))
                 .components(new Components()
-                        .addSecuritySchemes("encryptedUserKey", new SecurityScheme()
-                                .type(SecurityScheme.Type.APIKEY)
-                                .in(SecurityScheme.In.HEADER)
-                                .name("encryptedUserKey")
-                                .description("암호화된 사용자 키"))
-                        .addSecuritySchemes("userId", new SecurityScheme()
-                                .type(SecurityScheme.Type.APIKEY)
-                                .in(SecurityScheme.In.HEADER)
-                                .name("userId")
-                                .description("사용자 ID")))
+                        .addSecuritySchemes("bearerAuth", new SecurityScheme()
+                                .type(SecurityScheme.Type.HTTP)
+                                .scheme("bearer")
+                                .bearerFormat("JWT")
+                                .description("JWT 토큰을 입력하세요")))
                 .addSecurityItem(new SecurityRequirement()
-                        .addList("encryptedUserKey")
-                        .addList("userId"));
+                        .addList("bearerAuth"));
     }
 }
