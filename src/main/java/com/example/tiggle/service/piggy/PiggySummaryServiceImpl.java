@@ -75,12 +75,51 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
         return financialApiService
                 .inquireTransactionHistoryList(encryptedUserKey, piggyPoolAccountNo, start, end, "A", "ASC")
                 .map(res -> {
-                    return BigDecimal.ZERO;
+                    if (res == null || res.getRec() == null || res.getRec().getList() == null) {
+                        return BigDecimal.ZERO;
+                    }
+
+                    BigDecimal sum = BigDecimal.ZERO;
+                    for (InquireTransactionHistoryListREC r : res.getRec().getList()) {
+                        if (!"D".equalsIgnoreCase(r.getTransactionType())) continue;
+
+                        if (!isUserSavingRecord(r, userId)) continue;
+
+                        sum = sum.add(safeBigDecimal(r.getTransactionBalance()));
+                    }
+                    return sum;
                 })
                 .onErrorResume(e -> {
                     log.error("[Piggy][Summary] 지난주 적립액 조회 실패 → 0으로 대체", e);
                     return Mono.just(BigDecimal.ZERO);
                 });
+    }
+
+    private boolean isUserSavingRecord(InquireTransactionHistoryListREC r, Integer userId) {
+        final String summary = r.getTransactionSummary() == null ? "" : r.getTransactionSummary();
+        final String memo    = r.getTransactionMemo() == null ? "" : r.getTransactionMemo();
+
+        String[] userTags = new String[] {
+                "[UID:" + userId + "]",
+                "[UID=" + userId + "]",
+                "[userId=" + userId + "]",
+                "[USER:" + userId + "]"
+        };
+        boolean taggedWithUser = containsAny(summary, userTags) || containsAny(memo, userTags);
+
+        boolean taggedAsSaving =
+                summary.contains("[CHANGE]") || summary.contains("자투리") ||
+                        summary.contains("[DUTCH]")  || summary.contains("더치페이") ||
+                        summary.contains("[PIGGY]"); // 공통태그
+
+        return taggedWithUser && taggedAsSaving;
+    }
+
+    private boolean containsAny(String text, String[] needles) {
+        for (String n : needles) {
+            if (text.contains(n)) return true;
+        }
+        return false;
     }
 
     @Override
