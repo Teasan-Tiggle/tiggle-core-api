@@ -32,7 +32,7 @@ public class UniversityController {
      *
      * @return 전체 대학 목록
      */
-    @GetMapping("/")
+    @GetMapping("")
     @Operation(summary = "대학 목록 조회", description = "회원가입 시 전체 대학 목록을 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
