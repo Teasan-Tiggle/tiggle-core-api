@@ -50,50 +50,55 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
         return Mono.fromCallable(() ->
                 piggyBankRepository.findByOwner_Id(userId)
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다."))
-        ).flatMap(piggy ->
-                lastWeekSavedAmount(encryptedUserKey, userId)
-                        .map(lastWeek -> ApiResponse.success(
-                                new PiggySummaryResponse(piggy.getName(), piggy.getCurrentAmount(), lastWeek)
-                        ))
-        ).subscribeOn(Schedulers.boundedElastic());
+        ).flatMap(piggy -> {
+            // ✅ 개인 저금통 계좌 필수
+            if (piggy.getAccountNo() == null || piggy.getAccountNo().isBlank()) {
+                return Mono.error(new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "저금통 계좌가 없습니다. 먼저 개설해주세요."
+                ));
+            }
+            // 지난주 적립 합계는 개인 계좌 기준으로 계산
+            return lastWeekSavedAmount(encryptedUserKey, piggy.getAccountNo(), userId)
+                    .map(lastWeek -> ApiResponse.success(
+                            new PiggySummaryResponse(piggy.getName(), piggy.getCurrentAmount(), lastWeek)
+                    ));
+        }).subscribeOn(Schedulers.boundedElastic());
     }
+
 
 
     /**
      * 지난주(월~일) 적립 합계.
      * - inquireTransactionHistoryList 응답 DTO를 받으면 여기서 실제 합계 계산으로 교체해줄게.
      */
-    private Mono<BigDecimal> lastWeekSavedAmount(String encryptedUserKey, Integer userId) {
+    private Mono<BigDecimal> lastWeekSavedAmount(String encryptedUserKey, String accountNo, Integer userId) {
         LocalDate today = LocalDate.now();
         LocalDate lastWeekStart = today.minusWeeks(1).with(DayOfWeek.MONDAY);
-        LocalDate lastWeekEnd = lastWeekStart.with(DayOfWeek.SUNDAY);
+        LocalDate lastWeekEnd   = lastWeekStart.with(DayOfWeek.SUNDAY);
 
         DateTimeFormatter ymd = DateTimeFormatter.ofPattern("yyyyMMdd");
         String start = lastWeekStart.format(ymd);
-        String end = lastWeekEnd.format(ymd);
+        String end   = lastWeekEnd.format(ymd);
 
         return financialApiService
-                .inquireTransactionHistoryList(encryptedUserKey, piggyPoolAccountNo, start, end, "A", "ASC")
+                .inquireTransactionHistoryList(encryptedUserKey, accountNo, start, end, "A", "ASC")
                 .map(res -> {
                     if (res == null || res.getRec() == null || res.getRec().getList() == null) {
                         return BigDecimal.ZERO;
                     }
-
-                    BigDecimal sum = BigDecimal.ZERO;
-                    for (InquireTransactionHistoryListREC r : res.getRec().getList()) {
-                        if (!"D".equalsIgnoreCase(r.getTransactionType())) continue;
-
-                        if (!isUserSavingRecord(r, userId)) continue;
-
-                        sum = sum.add(safeBigDecimal(r.getTransactionBalance()));
-                    }
-                    return sum;
+                    // ✅ 입금(D)만 합산 (필요 시 isUserSavingRecord 필터 추가 가능)
+                    return res.getRec().getList().stream()
+                            .filter(r -> "D".equalsIgnoreCase(r.getTransactionType()))
+                            // .filter(r -> isUserSavingRecord(r, userId)) // 태그 기반으로 더 엄격히 필터하려면 주석 해제
+                            .map(r -> safeBigDecimal(r.getTransactionBalance()))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
                 })
                 .onErrorResume(e -> {
-                    log.error("[Piggy][Summary] 지난주 적립액 조회 실패 → 0으로 대체", e);
+                    log.error("[Piggy][Summary] 지난주 적립액 조회 실패 → 0으로 대체 (accountNo={})", accountNo, e);
                     return Mono.just(BigDecimal.ZERO);
                 });
     }
+
 
     private boolean isUserSavingRecord(InquireTransactionHistoryListREC r, Integer userId) {
         final String summary = r.getTransactionSummary() == null ? "" : r.getTransactionSummary();
