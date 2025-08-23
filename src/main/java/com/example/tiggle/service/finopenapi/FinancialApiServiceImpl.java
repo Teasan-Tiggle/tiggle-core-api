@@ -72,7 +72,7 @@ public class FinancialApiServiceImpl implements FinancialApiService {
     public Mono<CreateDemandDepositAccountResponse> createDemandDepositAccount(String userKey) {
         CreateDemandDepositAccountRequest request = CreateDemandDepositAccountRequest.builder()
                 .header(createHeader("createDemandDepositAccount", apiKey, userKey))
-                .accountTypeUniqueNo("088-1-ab66fb75b86349")
+                .accountTypeUniqueNo("088-1-c099deaaef7c41")
                 .build();
 
         return ssafyFinApiWebClient
