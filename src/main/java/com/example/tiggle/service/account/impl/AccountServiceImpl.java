@@ -1,5 +1,6 @@
 package com.example.tiggle.service.account.impl;
 
+import com.example.tiggle.dto.account.response.AccountHolderInfoDto;
 import com.example.tiggle.dto.account.response.OneWonVerificationResponse;
 import com.example.tiggle.dto.account.response.OneWonVerificationValidateResponse;
 import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
@@ -85,7 +86,7 @@ public class AccountServiceImpl implements AccountService {
             tokenService.markTokenAsUsed(verificationToken);
             
             log.info("주 계좌 등록 완료 - 사용자ID: {}, 계좌번호: {}", student.getId(), accountNo);
-            return ApiResponse.<Void>success();
+            return ApiResponse.success();
         });
     }
     
@@ -125,7 +126,33 @@ public class AccountServiceImpl implements AccountService {
             String errorMessage = "등록된 주 계좌가 없습니다.".equals(throwable.getMessage()) 
                     ? throwable.getMessage() 
                     : "계좌 조회 중 오류가 발생했습니다.";
-            return Mono.just(ApiResponse.<PrimaryAccountInfoDto>failure(errorMessage));
+            return Mono.just(ApiResponse.failure(errorMessage));
         });
+    }
+    
+    @Override
+    public Mono<ApiResponse<AccountHolderInfoDto>> getAccountHolder(String encryptedUserKey, String accountNo) {
+        String userKey = encryptionService.decrypt(encryptedUserKey);
+        
+        return financialApiService.inquireDemandDepositAccountHolderName(userKey, accountNo)
+                .map(response -> {
+                    if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
+                        AccountHolderInfoDto holderInfo = new AccountHolderInfoDto(
+                                response.getRec().getBankName(),
+                                response.getRec().getAccountNo(),
+                                response.getRec().getUserName()
+                        );
+                        return ApiResponse.success(holderInfo);
+                    } else {
+                        String errorMessage = response.getHeader() != null 
+                                ? response.getHeader().getResponseMessage() 
+                                : "예금주 조회 중 오류가 발생했습니다.";
+                        return ApiResponse.<AccountHolderInfoDto>failure(errorMessage);
+                    }
+                })
+                .onErrorResume(throwable -> {
+                    log.error("예금주 조회 중 오류 발생", throwable);
+                    return Mono.just(ApiResponse.failure("예금주 조회 중 오류가 발생했습니다."));
+                });
     }
 }
