@@ -1,7 +1,9 @@
 package com.example.tiggle.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
 
+@Getter
 @Entity
 public class University {
 
