@@ -57,14 +57,12 @@ public class PiggyCreationServiceImpl implements PiggyCreationService {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "금융 계좌 개설 실패: " + (msg != null ? msg : "알 수 없는 오류"));
             }
 
-            // 4) 생성된 계좌번호 추출
             String createdAccountNo = finRes.getRec() != null ? finRes.getRec().getAccountNo() : null;
             if (createdAccountNo == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "생성된 계좌번호가 누락되었습니다.");
             }
             log.info("[Piggy][Create] userId={}, createdAccountNo={}", userId, createdAccountNo);
 
-            // 5) 저금통 저장 (계좌번호 포함)
             PiggyBank pb = PiggyBank.builder()
                     .owner(owner)
                     .name(req.getName())
@@ -80,7 +78,6 @@ public class PiggyCreationServiceImpl implements PiggyCreationService {
 
             PiggyBank saved = piggyBankRepository.save(pb);
 
-            // 6) 응답 (지난주 적립액은 신규 0)
             PiggySummaryResponse body =
                     new PiggySummaryResponse(saved.getName(), saved.getCurrentAmount(), BigDecimal.ZERO);
 

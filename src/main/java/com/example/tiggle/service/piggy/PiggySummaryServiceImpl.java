@@ -9,29 +9,23 @@ import com.example.tiggle.dto.piggy.response.PiggyEntryItemDto;
 import com.example.tiggle.dto.piggy.response.PiggySummaryResponse;
 import com.example.tiggle.repository.piggy.PiggyBankRepository;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import java.util.Comparator;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
+import java.util.*;
+import java.util.Comparator;
 import java.util.Base64;
-import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -45,19 +39,16 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
     private String piggyPoolAccountNo;
 
     @Override
-    @Transactional(readOnly = true)
     public Mono<ApiResponse<PiggySummaryResponse>> getSummary(String encryptedUserKey, Integer userId) {
         return Mono.fromCallable(() ->
                 piggyBankRepository.findByOwner_Id(userId)
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다."))
         ).flatMap(piggy -> {
-            // ✅ 개인 저금통 계좌 필수
             if (piggy.getAccountNo() == null || piggy.getAccountNo().isBlank()) {
                 return Mono.error(new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "저금통 계좌가 없습니다. 먼저 개설해주세요."
                 ));
             }
-            // 지난주 적립 합계는 개인 계좌 기준으로 계산
             return lastWeekSavedAmount(encryptedUserKey, piggy.getAccountNo(), userId)
                     .map(lastWeek -> ApiResponse.success(
                             new PiggySummaryResponse(piggy.getName(), piggy.getCurrentAmount(), lastWeek)
@@ -65,12 +56,7 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-
-
-    /**
-     * 지난주(월~일) 적립 합계.
-     * - inquireTransactionHistoryList 응답 DTO를 받으면 여기서 실제 합계 계산으로 교체해줄게.
-     */
+    /** 지난주(월~일) 적립 합계 (입금 D 만 합산) */
     private Mono<BigDecimal> lastWeekSavedAmount(String encryptedUserKey, String accountNo, Integer userId) {
         LocalDate today = LocalDate.now();
         LocalDate lastWeekStart = today.minusWeeks(1).with(DayOfWeek.MONDAY);
@@ -86,10 +72,9 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
                     if (res == null || res.getRec() == null || res.getRec().getList() == null) {
                         return BigDecimal.ZERO;
                     }
-                    // ✅ 입금(D)만 합산 (필요 시 isUserSavingRecord 필터 추가 가능)
                     return res.getRec().getList().stream()
                             .filter(r -> "D".equalsIgnoreCase(r.getTransactionType()))
-                            // .filter(r -> isUserSavingRecord(r, userId)) // 태그 기반으로 더 엄격히 필터하려면 주석 해제
+                            // .filter(r -> isUserSavingRecord(r, userId)) // 태그로 더 좁히려면 주석 해제
                             .map(r -> safeBigDecimal(r.getTransactionBalance()))
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
                 })
@@ -98,7 +83,6 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
                     return Mono.just(BigDecimal.ZERO);
                 });
     }
-
 
     private boolean isUserSavingRecord(InquireTransactionHistoryListREC r, Integer userId) {
         final String summary = r.getTransactionSummary() == null ? "" : r.getTransactionSummary();
@@ -115,21 +99,19 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
         boolean taggedAsSaving =
                 summary.contains("[CHANGE]") || summary.contains("자투리") ||
                         summary.contains("[DUTCH]")  || summary.contains("더치페이") ||
-                        summary.contains("[PIGGY]"); // 공통태그
+                        summary.contains("[PIGGY]");
 
         return taggedWithUser && taggedAsSaving;
     }
 
     private boolean containsAny(String text, String[] needles) {
-        for (String n : needles) {
-            if (text.contains(n)) return true;
-        }
+        for (String n : needles) if (text.contains(n)) return true;
         return false;
     }
 
     @Override
     public Mono<ApiResponse<PiggyEntriesPageResponse>> getEntriesPage(
-            String encryptedUserKey, Integer userId, PiggyEntriesPageRequest req) {
+            String encryptedUserKey, Integer userId, com.example.tiggle.dto.piggy.request.PiggyEntriesPageRequest req) {
 
         return Mono.fromCallable(() ->
                 piggyBankRepository.findByOwner_Id(userId)
@@ -147,42 +129,36 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
             return financialApiService.inquireTransactionHistoryList(
                             encryptedUserKey, piggy.getAccountNo(),
                             from.format(YMD), to.format(YMD),
-                            "A", "ASC" // 전체, 내림차순
+                            "A", "ASC"
                     )
                     .map(res -> {
-                        // 금융 응답 → 내부 표준
                         List<SimpleTx> all = mapToSimpleTxList(res);
 
-                        // === [중요] 입금만(D) + 태그로 타입 구분 ===
                         String standard = toStandardType(req.getType()); // "CHANGE" or "DUTCHPAY"
                         List<SimpleTx> filtered = all.stream()
-                                .filter(tx -> "D".equalsIgnoreCase(tx.typeCode))            // 입금만
-                                .filter(tx -> matchTypeBySummary(tx, standard))             // TIGGLE/DUTCHPAY 구분
+                                .filter(tx -> "D".equalsIgnoreCase(tx.typeCode)) // 입금만
+                                .filter(tx -> matchTypeBySummary(tx, standard))
                                 .sorted(Comparator
                                         .comparing((SimpleTx t) -> t.occurredAt).reversed()
                                         .thenComparing(t -> t.id, Comparator.reverseOrder()))
                                 .toList();
 
-                        // 커서 슬라이싱
                         Cursor cur = decodeCursor(req.getCursor());
-                        if (cur != null) {
-                            filtered = filtered.stream().filter(tx -> isBeforeCursor(tx, cur)).toList();
-                        }
+                        if (cur != null) filtered = filtered.stream().filter(tx -> isBeforeCursor(tx, cur)).toList();
 
                         boolean hasNext = filtered.size() > size;
                         List<SimpleTx> page = filtered.stream().limit(size).toList();
 
                         String nextCursor = null;
-                        if (hasNext) nextCursor = encodeCursor(page.get(page.size()-1));
+                        if (hasNext) nextCursor = encodeCursor(page.get(page.size() - 1));
 
-                        ZoneOffset offset = ZoneId.systemDefault().getRules()
-                                .getOffset(Instant.now());
+                        ZoneOffset offset = ZoneId.systemDefault().getRules().getOffset(Instant.now());
 
                         List<PiggyEntryItemDto> items = page.stream().map(tx ->
                                 new PiggyEntryItemDto(
                                         tx.id,
                                         standard,
-                                        tx.amount, // 입금은 + 금액
+                                        tx.amount,
                                         tx.occurredAt.atOffset(offset),
                                         buildWeekTitle(tx.occurredAt.toLocalDate(), standard)
                                 )
@@ -197,7 +173,6 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    // ② helper들 (클래스 내부 private 메서드로)
     private static final DateTimeFormatter YMD_NUM = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter HMS_NUM = DateTimeFormatter.ofPattern("HHmmss");
 
@@ -215,7 +190,6 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
             LocalDateTime occurredAt = LocalDateTime.of(date, time);
 
             BigDecimal amount = safeBigDecimal(r.getTransactionBalance());
-
             if ("W".equalsIgnoreCase(r.getTransactionType())) amount = amount.negate();
 
             SimpleTx tx = new SimpleTx();
@@ -251,10 +225,15 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
     private Cursor decodeCursor(String cursor) {
         if (cursor == null || cursor.isBlank()) return null;
         try {
-            String json = new String(Base64.getDecoder().decode(cursor), StandardCharsets.UTF_8);
-            Map<String,Object> map = new ObjectMapper().readValue(json, new TypeReference<Map<String,Object>>(){});
+            String json = new String(Base64.getDecoder().decode(cursor));
+            var map = new HashMap<String, Object>();
+            json = json.replaceAll("[\\{\\}\"]", "");
+            for (String p : json.split(",")) {
+                String[] kv = p.split(":");
+                if (kv.length == 2) map.put(kv[0].trim(), kv[1].trim());
+            }
             Cursor c = new Cursor();
-            c.epochMilli = ((Number) map.get("t")).longValue();
+            c.epochMilli = Long.parseLong((String) map.get("t"));
             c.id = (String) map.get("i");
             return c;
         } catch (Exception e) { return null; }
@@ -263,14 +242,14 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
     private String encodeCursor(SimpleTx tx) {
         long t = tx.occurredAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
         String json = String.format("{\"t\":%d,\"i\":\"%s\"}", t, tx.id);
-        return Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(json.getBytes());
     }
 
     private boolean isBeforeCursor(SimpleTx tx, Cursor c) {
         long t = tx.occurredAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
         if (t < c.epochMilli) return true;
         if (t > c.epochMilli) return false;
-        return tx.id.compareTo(c.id) < 0; // 동시간대 tie-break
+        return tx.id.compareTo(c.id) < 0;
     }
 
     private String buildWeekTitle(LocalDate date, String standardType) {
@@ -288,6 +267,4 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
         String summary;
         String typeCode; // "D"/"W"
     }
-
-
 }

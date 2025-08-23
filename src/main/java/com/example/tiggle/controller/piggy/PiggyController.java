@@ -1,24 +1,22 @@
 package com.example.tiggle.controller.piggy;
 
 import com.example.tiggle.dto.common.ApiResponse;
-import com.example.tiggle.dto.piggy.request.PiggyEntriesPageRequest;
-import com.example.tiggle.dto.piggy.response.PiggyEntriesPageResponse;
 import com.example.tiggle.dto.piggy.request.CreatePiggyBankRequest;
+import com.example.tiggle.dto.piggy.request.PiggyEntriesPageRequest;
 import com.example.tiggle.dto.piggy.request.UpdatePiggySettingsRequest;
 import com.example.tiggle.dto.piggy.response.PiggyBankResponse;
+import com.example.tiggle.dto.piggy.response.PiggyEntriesPageResponse;
 import com.example.tiggle.dto.piggy.response.PiggySummaryResponse;
 import com.example.tiggle.service.piggy.PiggyCreationService;
 import com.example.tiggle.service.piggy.PiggyService;
 import com.example.tiggle.service.piggy.PiggySummaryService;
+import com.example.tiggle.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/piggy")
@@ -32,72 +30,68 @@ public class PiggyController {
 
     @Operation(summary = "내 저금통 조회")
     @GetMapping
-    public Mono<ApiResponse<PiggyBankResponse>> getMyPiggy(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader("userId") Integer userId
-    ) {
-        return piggySettingsService.getMyPiggy(userId);
+    public ResponseEntity<ApiResponse<PiggyBankResponse>> getMyPiggy() {
+        Integer userId = JwtUtil.getCurrentUserId();
+        // 서비스에서 없으면 ResponseStatusException(404) 던짐 → 전역 핸들러가 그대로 내려줌
+        ApiResponse<PiggyBankResponse> body = piggySettingsService.getMyPiggy(userId).block();
+        return ResponseEntity.ok(body);
     }
 
     @Operation(summary = "저금통 설정 수정", description = "name/targetAmount/autoSaving/autoDonation/esgCategoryId(선택) 부분 수정")
     @PatchMapping("/settings")
-    public Mono<ApiResponse<PiggyBankResponse>> updateSettings(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader("userId") Integer userId,
-            @RequestBody UpdatePiggySettingsRequest request
+    public ResponseEntity<ApiResponse<PiggyBankResponse>> updateSettings(
+            @Valid @RequestBody UpdatePiggySettingsRequest request
     ) {
-        return piggySettingsService.updateSettings(userId, request);
+        Integer userId = JwtUtil.getCurrentUserId();
+        ApiResponse<PiggyBankResponse> body = piggySettingsService.updateSettings(userId, request).block();
+        return ResponseEntity.ok(body);
     }
 
     @Operation(summary = "ESG 카테고리 설정")
     @PutMapping("/category/{categoryId}")
-    public Mono<ApiResponse<PiggyBankResponse>> setCategory(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader("userId") Integer userId,
-            @PathVariable Long categoryId
-    ) {
-        return piggySettingsService.setCategory(userId, categoryId);
+    public ResponseEntity<ApiResponse<PiggyBankResponse>> setCategory(@PathVariable Long categoryId) {
+        Integer userId = JwtUtil.getCurrentUserId();
+        ApiResponse<PiggyBankResponse> body = piggySettingsService.setCategory(userId, categoryId).block();
+        return ResponseEntity.ok(body);
     }
 
     @Operation(summary = "ESG 카테고리 해제")
     @DeleteMapping("/category")
-    public Mono<ApiResponse<PiggyBankResponse>> unsetCategory(
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader("userId") Integer userId
-    ) {
-        return piggySettingsService.unsetCategory(userId);
+    public ResponseEntity<ApiResponse<PiggyBankResponse>> unsetCategory() {
+        Integer userId = JwtUtil.getCurrentUserId();
+        ApiResponse<PiggyBankResponse> body = piggySettingsService.unsetCategory(userId).block();
+        return ResponseEntity.ok(body);
     }
 
     @Operation(summary = "저금통 정보 조회(Summary)")
     @GetMapping("/summary")
-    public Mono<ApiResponse<PiggySummaryResponse>> getSummary(
-            @Parameter(description = "암호화된 사용자 키", required = true)
-            @RequestHeader("encryptedUserKey") String encryptedUserKey,
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader("userId") Integer userId
-    ) {
-        return piggySummaryService.getSummary(encryptedUserKey, userId);
+    public ResponseEntity<ApiResponse<PiggySummaryResponse>> getSummary() {
+        String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
+        Integer userId = JwtUtil.getCurrentUserId();
+        ApiResponse<PiggySummaryResponse> body = piggySummaryService.getSummary(encryptedUserKey, userId).block();
+        return ResponseEntity.ok(body);
     }
 
     @Operation(summary = "저금통 계좌 개설")
     @PostMapping
-    public Mono<ApiResponse<PiggySummaryResponse>> createPiggy(
-            @Parameter(description = "암호화된 사용자 키", required = true)
-            @RequestHeader("encryptedUserKey") String encryptedUserKey,
-            @Parameter(description = "사용자 ID", required = true)
-            @RequestHeader("userId") Integer userId,
+    public ResponseEntity<ApiResponse<PiggySummaryResponse>> createPiggy(
             @Valid @RequestBody CreatePiggyBankRequest request
     ) {
-        return piggyCreationService.create(encryptedUserKey, userId, request);
+        String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
+        Integer userId = JwtUtil.getCurrentUserId();
+        ApiResponse<PiggySummaryResponse> body = piggyCreationService.create(encryptedUserKey, userId, request).block();
+        return ResponseEntity.ok(body);
     }
 
-    @Operation(summary = "저금통 내역 조회(커서 페이지네이션)")
-    @PostMapping("/detail/entries")
-    public Mono<ApiResponse<PiggyEntriesPageResponse>> getEntriesPage(
-            @RequestHeader("encryptedUserKey") String encryptedUserKey,
-            @RequestHeader("userId") Integer userId,
-            @RequestBody PiggyEntriesPageRequest request
+    @Operation(summary = "저금통 적립 내역 조회(커서 페이지네이션)")
+    @PostMapping("/entries")
+    public ResponseEntity<ApiResponse<PiggyEntriesPageResponse>> getEntriesPage(
+            @Valid @RequestBody PiggyEntriesPageRequest request
     ) {
-        return piggySummaryService.getEntriesPage(encryptedUserKey, userId, request);
+        String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
+        Integer userId = JwtUtil.getCurrentUserId();
+        ApiResponse<PiggyEntriesPageResponse> body =
+                piggySummaryService.getEntriesPage(encryptedUserKey, userId, request).block();
+        return ResponseEntity.ok(body);
     }
 }
