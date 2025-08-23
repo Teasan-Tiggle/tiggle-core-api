@@ -9,9 +9,9 @@ import com.example.tiggle.dto.piggy.response.PiggyEntryItemDto;
 import com.example.tiggle.dto.piggy.response.PiggySummaryResponse;
 import com.example.tiggle.repository.piggy.PiggyBankRepository;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
+import com.example.tiggle.service.security.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -24,8 +24,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
-import java.util.Comparator;
 import java.util.Base64;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -34,9 +34,7 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
 
     private final PiggyBankRepository piggyBankRepository;
     private final FinancialApiService financialApiService;
-
-    @Value("${piggy.pool.account-no}")
-    private String piggyPoolAccountNo;
+    private final EncryptionService encryptionService; // ★ 추가
 
     @Override
     public Mono<ApiResponse<PiggySummaryResponse>> getSummary(String encryptedUserKey, Integer userId) {
@@ -49,15 +47,17 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
                         HttpStatus.NOT_FOUND, "저금통 계좌가 없습니다. 먼저 개설해주세요."
                 ));
             }
-            return lastWeekSavedAmount(encryptedUserKey, piggy.getAccountNo(), userId)
+            final String userKey = encryptionService.decrypt(encryptedUserKey);
+
+            return lastWeekSavedAmount(userKey, piggy.getAccountNo(), userId)
                     .map(lastWeek -> ApiResponse.success(
                             new PiggySummaryResponse(piggy.getName(), piggy.getCurrentAmount(), lastWeek)
                     ));
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    /** 지난주(월~일) 적립 합계 (입금 D 만 합산) */
-    private Mono<BigDecimal> lastWeekSavedAmount(String encryptedUserKey, String accountNo, Integer userId) {
+    /** 지난주(월~일) 적립 합계 (입금 D 만 합산) — userKey는 평문 */
+    private Mono<BigDecimal> lastWeekSavedAmount(String userKeyPlain, String accountNo, Integer userId) {
         LocalDate today = LocalDate.now();
         LocalDate lastWeekStart = today.minusWeeks(1).with(DayOfWeek.MONDAY);
         LocalDate lastWeekEnd   = lastWeekStart.with(DayOfWeek.SUNDAY);
@@ -67,7 +67,7 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
         String end   = lastWeekEnd.format(ymd);
 
         return financialApiService
-                .inquireTransactionHistoryList(encryptedUserKey, accountNo, start, end, "A", "ASC")
+                .inquireTransactionHistoryList(userKeyPlain, accountNo, start, end, "A", "ASC")
                 .map(res -> {
                     if (res == null || res.getRec() == null || res.getRec().getList() == null) {
                         return BigDecimal.ZERO;
@@ -111,7 +111,7 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
 
     @Override
     public Mono<ApiResponse<PiggyEntriesPageResponse>> getEntriesPage(
-            String encryptedUserKey, Integer userId, com.example.tiggle.dto.piggy.request.PiggyEntriesPageRequest req) {
+            String encryptedUserKey, Integer userId, PiggyEntriesPageRequest req) {
 
         return Mono.fromCallable(() ->
                 piggyBankRepository.findByOwner_Id(userId)
@@ -126,8 +126,10 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
             DateTimeFormatter YMD = DateTimeFormatter.ofPattern("yyyyMMdd");
             int size = Math.min(Math.max(req.getSize() == null ? 20 : req.getSize(), 1), 100);
 
+            final String userKey = encryptionService.decrypt(encryptedUserKey);
+
             return financialApiService.inquireTransactionHistoryList(
-                            encryptedUserKey, piggy.getAccountNo(),
+                            userKey, piggy.getAccountNo(),
                             from.format(YMD), to.format(YMD),
                             "A", "ASC"
                     )

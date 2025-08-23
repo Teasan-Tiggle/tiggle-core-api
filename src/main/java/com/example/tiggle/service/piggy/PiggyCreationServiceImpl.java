@@ -10,11 +10,13 @@ import com.example.tiggle.repository.esg.EsgCategoryRepository;
 import com.example.tiggle.repository.piggy.PiggyBankRepository;
 import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
+import com.example.tiggle.service.security.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -30,10 +32,12 @@ public class PiggyCreationServiceImpl implements PiggyCreationService {
     private final StudentRepository studentRepository;
     private final EsgCategoryRepository esgCategoryRepository;
     private final FinancialApiService financialApiService;
+    private final EncryptionService encryptionService;
 
     @Override
     @Transactional
     public Mono<ApiResponse<PiggySummaryResponse>> create(String encryptedUserKey, Integer userId, CreatePiggyBankRequest req) {
+        String userKey = encryptionService.decrypt(encryptedUserKey);
         return Mono.fromCallable(() -> {
             // 1) 중복 방지
             piggyBankRepository.findByOwner_Id(userId).ifPresent(pb -> {
@@ -45,7 +49,7 @@ public class PiggyCreationServiceImpl implements PiggyCreationService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "사용자를 찾을 수 없습니다."));
 
             // 3) 금융 API: 예금계좌 생성
-            var finRes = financialApiService.createDemandDepositAccount(encryptedUserKey)
+            var finRes = financialApiService.createDemandDepositAccount(userKey)
                     .onErrorMap(e -> new ResponseStatusException(HttpStatus.BAD_GATEWAY, "금융API 호출 실패", e))
                     .block();
 
