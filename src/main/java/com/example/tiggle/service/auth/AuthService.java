@@ -1,10 +1,10 @@
-package com.example.tiggle.service.user;
+package com.example.tiggle.service.auth;
 
-import com.example.tiggle.dto.user.JoinRequestDto;
+import com.example.tiggle.dto.auth.JoinRequestDto;
 
 import java.util.Map;
 
-public interface StudentService {
+public interface AuthService {
     /**
      * 중복 이메일 여부를 체크한다.
      *

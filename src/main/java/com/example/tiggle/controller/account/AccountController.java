@@ -3,9 +3,11 @@ package com.example.tiggle.controller.account;
 import com.example.tiggle.dto.account.request.OneWonVerificationRequest;
 import com.example.tiggle.dto.account.request.OneWonVerificationValidateRequest;
 import com.example.tiggle.dto.account.request.PrimaryAccountRequest;
+import com.example.tiggle.dto.account.response.AccountHolderInfoDto;
 import com.example.tiggle.dto.account.response.OneWonVerificationResponse;
 import com.example.tiggle.dto.account.response.OneWonVerificationValidateResponse;
 import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
+import com.example.tiggle.dto.account.response.TransactionHistoryResponse;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.service.account.AccountService;
 import com.example.tiggle.util.JwtUtil;
@@ -70,7 +72,7 @@ public class AccountController {
             return ResponseEntity.ok(response);
         } catch (Exception error) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<Void>failure("서버 오류가 발생했습니다."));
+                    .body(ApiResponse.failure("서버 오류가 발생했습니다."));
         }
     }
     
@@ -86,7 +88,42 @@ public class AccountController {
             return ResponseEntity.ok(response);
         } catch (Exception error) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<PrimaryAccountInfoDto>failure("서버 오류가 발생했습니다."));
+                    .body(ApiResponse.failure("서버 오류가 발생했습니다."));
+        }
+    }
+    
+    @Operation(summary = "예금주 조회", description = "계좌번호로 예금주 정보를 조회합니다")
+    @GetMapping("/holder")
+    public ResponseEntity<ApiResponse<AccountHolderInfoDto>> getAccountHolder(
+            @RequestParam String accountNo) {
+        
+        String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
+        
+        try {
+            ApiResponse<AccountHolderInfoDto> response = accountService.getAccountHolder(encryptedUserKey, accountNo).block();
+            return ResponseEntity.ok(response);
+        } catch (Exception error) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.failure("서버 오류가 발생했습니다."));
+        }
+    }
+    
+    @Operation(summary = "거래 내역 조회", description = "계좌의 거래 내역을 커서 기반 페이징으로 조회합니다")
+    @GetMapping("/transactions")
+    public ResponseEntity<ApiResponse<TransactionHistoryResponse>> getTransactionHistory(
+            @RequestParam String accountNo,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "20") Integer size,
+            @RequestParam(defaultValue = "DESC") String sort) {
+        
+        String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
+        
+        try {
+            ApiResponse<TransactionHistoryResponse> response = accountService.getTransactionHistory(encryptedUserKey, accountNo, cursor, size, sort).block();
+            return ResponseEntity.ok(response);
+        } catch (Exception error) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.failure("서버 오류가 발생했습니다."));
         }
     }
 }
