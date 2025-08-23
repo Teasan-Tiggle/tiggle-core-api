@@ -4,7 +4,7 @@ import com.example.tiggle.dto.ResponseDto;
 import com.example.tiggle.dto.auth.EmailSendRequestDto;
 import com.example.tiggle.dto.auth.EmailVerifyRequestDto;
 import com.example.tiggle.service.auth.EmailAuthService;
-import com.example.tiggle.service.user.StudentService;
+import com.example.tiggle.service.auth.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "이메일 인증 API", description = "이메일로 인증코드를 발급하고 검증합니다.")
 public class EmailAuthController {
 
-    private final StudentService studentService;
+    private final AuthService studentService;
     private final EmailAuthService emailAuthService;
 
     /**
@@ -33,7 +33,7 @@ public class EmailAuthController {
      *
      * @return 전송 결과
      */
-    @PostMapping("/send")
+    @PostMapping("/send/signup")
     @Operation(summary = "이메일 인증코드 전송", description = "입력한 이메일 주소로 인증코드를 전송합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "인증 번호 전송 결과 반환"),

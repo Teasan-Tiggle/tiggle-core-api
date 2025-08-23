@@ -1,11 +1,11 @@
-package com.example.tiggle.service.user;
+package com.example.tiggle.service.auth;
 
 import com.example.tiggle.dto.finopenapi.response.UserResponse;
-import com.example.tiggle.dto.user.JoinRequestDto;
+import com.example.tiggle.dto.auth.JoinRequestDto;
 import com.example.tiggle.entity.Department;
 import com.example.tiggle.entity.Student;
 import com.example.tiggle.entity.University;
-import com.example.tiggle.exception.user.UserAuthException;
+import com.example.tiggle.exception.auth.AuthException;
 import com.example.tiggle.repository.user.DepartmentRepository;
 import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.repository.user.UniversityRepository;
@@ -24,9 +24,9 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class StudentServiceImpl implements StudentService {
+public class AuthServiceImpl implements AuthService {
 
-    private static final Logger logger = LoggerFactory.getLogger(StudentServiceImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(AuthServiceImpl.class);
 
     private final StudentRepository studentRepository;
     private final UniversityRepository universityRepository;
@@ -51,36 +51,36 @@ public class StudentServiceImpl implements StudentService {
 
         // 1. DB 중복 체크
         if (checkDuplicateEmail(requestDto.getEmail())) {
-            throw UserAuthException.duplicateEmail();
+            throw AuthException.duplicateEmail();
         }
         if (checkDuplicateStudent(requestDto.getUniversityId(), requestDto.getStudentId())) {
-            throw UserAuthException.duplicateStudent(requestDto.getUniversityId(), requestDto.getStudentId());
+            throw AuthException.duplicateStudent(requestDto.getUniversityId(), requestDto.getStudentId());
         }
 
         // 2. University 및 Department 엔티티 조회
         University university = universityRepository.findById(requestDto.getUniversityId())
-                .orElseThrow(() -> UserAuthException.universityNotFound(requestDto.getUniversityId()));
+                .orElseThrow(() -> AuthException.universityNotFound(requestDto.getUniversityId()));
         Department department = departmentRepository.findById(requestDto.getDepartmentId())
-                .orElseThrow(() -> UserAuthException.departmentNotFound(requestDto.getDepartmentId()));
+                .orElseThrow(() -> AuthException.departmentNotFound(requestDto.getDepartmentId()));
 
         // 3. 금융 API 서버 중복 체크 및 userKey 획득 또는 생성
         try {
             UserResponse externalUserResponse = financialApiService.searchUser(requestDto.getEmail()).block();
             logger.warn("금융 API 내 사용자 계정 존재: {}", requestDto.getEmail());
-            throw UserAuthException.duplicateEmail();
+            throw AuthException.duplicateEmail();
         } catch (WebClientResponseException.NotFound | WebClientResponseException.BadRequest ex) {
             logger.warn("금융 API 내 사용자 계정 없음: {}", requestDto.getEmail());
         } catch (Exception e) {
-            throw UserAuthException.externalApiFailure("외부 API 사용자 조회 중 오류가 발생했습니다.", e);
+            throw AuthException.externalApiFailure("외부 API 사용자 조회 중 오류가 발생했습니다.", e);
         }
 
         try {
             UserResponse createdUser = financialApiService.createUser(requestDto.getEmail()).block();
             if (createdUser == null || createdUser.getUserKey() == null) {
-                throw UserAuthException.externalApiUserCreationFailure("금융 API 사용자 계정 생성 중 오류가 발생했습니다.", null);
+                throw AuthException.externalApiUserCreationFailure("금융 API 사용자 계정 생성 중 오류가 발생했습니다.", null);
             }
         } catch (Exception e) {
-            throw UserAuthException.externalApiUserCreationFailure("금융 API 사용자 계정 생성 중 오류가 발생했습니다.", e);
+            throw AuthException.externalApiUserCreationFailure("금융 API 사용자 계정 생성 중 오류가 발생했습니다.", e);
         }
 
         // 4. 비밀번호 해싱
@@ -102,7 +102,7 @@ public class StudentServiceImpl implements StudentService {
             return true;
         } catch (Exception e) {
             logger.error("사용자 정보 저장 실패: {}", requestDto.getEmail(), e);
-            throw UserAuthException.externalApiFailure("DB 사용자 정보 저장 중 오류가 발생했습니다.", e);
+            throw AuthException.externalApiFailure("DB 사용자 정보 저장 중 오류가 발생했습니다.", e);
         }
     }
 
@@ -110,18 +110,18 @@ public class StudentServiceImpl implements StudentService {
     public Map<String, Object> loginUser(String email, String password) {
         // 1. DB에서 사용자 찾기
         Student student = studentRepository.findByEmail(email)
-                .orElseThrow(UserAuthException::userNotFound);
+                .orElseThrow(AuthException::userNotFound);
 
         // 2. 비밀번호 일치 여부 확인
         if (!passwordEncoder.matches(password, student.getPassword())) {
-            throw UserAuthException.passwordMismatch();
+            throw AuthException.passwordMismatch();
         }
 
         // 3. 금융 API 서버에서 userKey 조회
         try {
             UserResponse userResponse = financialApiService.searchUser(email).block();
             if (userResponse == null || userResponse.getUserKey() == null) {
-                throw UserAuthException.externalApiUserNotFound();
+                throw AuthException.externalApiUserNotFound();
             }
 
             // 4. userKey를 암호화
@@ -134,7 +134,7 @@ public class StudentServiceImpl implements StudentService {
             return result;
 
         } catch (Exception e) {
-            throw UserAuthException.externalApiFailure(e.getMessage(), e);
+            throw AuthException.externalApiFailure(e.getMessage(), e);
         }
     }
 }
