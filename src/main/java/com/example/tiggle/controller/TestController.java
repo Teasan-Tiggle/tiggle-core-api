@@ -26,7 +26,7 @@ public class TestController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 //        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
 
-        int userId = userDetails.getUserId();
+        Long userId = userDetails.getUserId();
         String encryptedUserKey = userDetails.getEncryptedUserKey();
 
         // 암호화된 userKey 복호화

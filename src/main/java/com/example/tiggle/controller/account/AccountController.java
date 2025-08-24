@@ -48,7 +48,7 @@ public class AccountController {
             @RequestBody OneWonVerificationValidateRequest request) {
         
         String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         
         try {
             OneWonVerificationValidateResponse response = accountService.validateOneWonAuth(encryptedUserKey, request.getAccountNo(), request.getAuthCode(), userId).block();
@@ -64,7 +64,7 @@ public class AccountController {
     public ResponseEntity<ApiResponse<Void>> registerPrimaryAccount(
             @RequestBody PrimaryAccountRequest request) {
         
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         
         try {
             ApiResponse<Void> response = accountService.registerPrimaryAccount(
@@ -81,7 +81,7 @@ public class AccountController {
     public ResponseEntity<ApiResponse<PrimaryAccountInfoDto>> getPrimaryAccount() {
         
         String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         
         try {
             ApiResponse<PrimaryAccountInfoDto> response = accountService.getPrimaryAccount(encryptedUserKey, userId).block();

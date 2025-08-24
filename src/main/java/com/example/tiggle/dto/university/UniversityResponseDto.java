@@ -11,7 +11,7 @@ import lombok.Setter;
 public class UniversityResponseDto {
 
     @Schema(description = "대학 ID", example = "1")
-    private Integer id;
+    private Long id;
 
     @Schema(description = "대학명", example = "신한대학교")
     private String name;

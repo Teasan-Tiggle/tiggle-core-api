@@ -29,7 +29,7 @@ public class UniversityServiceImpl implements UniversityService {
     public List<DepartmentResponseDto> getAllDepartments(Long universityId) {
         return departmentRepository.findByUniversityIdOrderByNameAsc(universityId)
                 .stream()
-                .map(u -> new DepartmentResponseDto(u.getId(), u.getName()))
+                .map(d -> new DepartmentResponseDto(d.getId(), d.getName()))
                 .collect(Collectors.toList());
     }
 }

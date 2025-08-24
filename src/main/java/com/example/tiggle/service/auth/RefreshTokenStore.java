@@ -13,11 +13,11 @@ public class RefreshTokenStore {
 
     private final StringRedisTemplate redis;
 
-    private String refreshTokenKey(int userId) {
+    private String refreshTokenKey(Long userId) {
         return "refreshToken:" + userId;
     }
 
-    public void save(int userId, String refreshToken, String encryptedUserKey, Duration ttl) {
+    public void save(Long userId, String refreshToken, String encryptedUserKey, Duration ttl) {
         String key = refreshTokenKey(userId);
         redis.opsForHash().putAll(key, Map.of(
                 "refreshToken", refreshToken,
@@ -26,12 +26,12 @@ public class RefreshTokenStore {
         redis.expire(key, ttl);
     }
 
-    public Map<Object, Object> get(int userId) {
+    public Map<Object, Object> get(Long userId) {
         String key = refreshTokenKey(userId);
         return redis.opsForHash().entries(key);
     }
 
-    public void delete(int userId) {
+    public void delete(Long userId) {
         String key = refreshTokenKey(userId);
         redis.delete(key);
     }

@@ -26,7 +26,7 @@ public class AccountVerificationToken {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private Student student;
+    private Users user;
     
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
@@ -34,10 +34,10 @@ public class AccountVerificationToken {
     @Column(nullable = false)
     private Boolean used = false;
     
-    public AccountVerificationToken(String accountNo, String verificationToken, Student student, LocalDateTime expiresAt) {
+    public AccountVerificationToken(String accountNo, String verificationToken, Users user, LocalDateTime expiresAt) {
         this.accountNo = accountNo;
         this.verificationToken = verificationToken;
-        this.student = student;
+        this.user = user;
         this.expiresAt = expiresAt;
         this.used = false;
     }

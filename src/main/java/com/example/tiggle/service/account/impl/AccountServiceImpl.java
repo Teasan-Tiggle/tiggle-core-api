@@ -7,7 +7,7 @@ import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
 import com.example.tiggle.dto.account.response.TransactionDto;
 import com.example.tiggle.dto.account.response.TransactionHistoryResponse;
 import com.example.tiggle.dto.common.ApiResponse;
-import com.example.tiggle.entity.Student;
+import com.example.tiggle.entity.Users;
 import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.account.AccountService;
 import com.example.tiggle.service.account.AccountVerificationTokenService;
@@ -55,14 +55,14 @@ public class AccountServiceImpl implements AccountService {
     }
     
     @Override
-    public Mono<OneWonVerificationValidateResponse> validateOneWonAuth(String encryptedUserKey, String accountNo, String authCode, Integer userId) {
+    public Mono<OneWonVerificationValidateResponse> validateOneWonAuth(String encryptedUserKey, String accountNo, String authCode, Long userId) {
         String userKey = encryptionService.decrypt(encryptedUserKey);
         return financialApiService.checkAuthCode(userKey, accountNo, "티끌", authCode)
                 .map(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
-                        Student student = studentRepository.findById(userId)
+                        Users users = studentRepository.findById(userId)
                                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
-                        String verificationToken = tokenService.generateVerificationToken(accountNo, student);
+                        String verificationToken = tokenService.generateVerificationToken(accountNo, users);
                         return OneWonVerificationValidateResponse.success(verificationToken);
                     } else {
                         String errorMessage = response.getHeader() != null 
@@ -78,36 +78,36 @@ public class AccountServiceImpl implements AccountService {
     }
     
     @Override
-    public Mono<ApiResponse<Void>> registerPrimaryAccount(String accountNo, String verificationToken, Integer userId) {
+    public Mono<ApiResponse<Void>> registerPrimaryAccount(String accountNo, String verificationToken, Long userId) {
         return Mono.fromCallable(() -> {
             if (!tokenService.validateTokenForAccount(verificationToken, accountNo)) {
                 return ApiResponse.<Void>failure("유효하지 않은 검증 토큰이거나 계좌번호가 일치하지 않습니다.");
             }
             
-            Student student = studentRepository.findById(userId)
+            Users user = studentRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
             
-            student.setPrimaryAccountNo(accountNo);
-            studentRepository.save(student);
+            user.setPrimaryAccountNo(accountNo);
+            studentRepository.save(user);
             
             tokenService.markTokenAsUsed(verificationToken);
             
-            log.info("주 계좌 등록 완료 - 사용자ID: {}, 계좌번호: {}", student.getId(), accountNo);
+            log.info("주 계좌 등록 완료 - 사용자ID: {}, 계좌번호: {}", user.getId(), accountNo);
             return ApiResponse.success();
         });
     }
     
     @Override
-    public Mono<ApiResponse<PrimaryAccountInfoDto>> getPrimaryAccount(String encryptedUserKey, Integer userId) {
+    public Mono<ApiResponse<PrimaryAccountInfoDto>> getPrimaryAccount(String encryptedUserKey, Long userId) {
         return Mono.fromCallable(() -> {
-            Student student = studentRepository.findById(userId)
+            Users user = studentRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
             
-            if (student.getPrimaryAccountNo() == null) {
+            if (user.getPrimaryAccountNo() == null) {
                 throw new RuntimeException("등록된 주 계좌가 없습니다.");
             }
             
-            return student.getPrimaryAccountNo();
+            return user.getPrimaryAccountNo();
         })
         .flatMap(accountNo -> {
             String userKey = encryptionService.decrypt(encryptedUserKey);

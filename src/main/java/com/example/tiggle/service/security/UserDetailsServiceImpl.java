@@ -1,6 +1,6 @@
 package com.example.tiggle.service.security;
 
-import com.example.tiggle.entity.Student;
+import com.example.tiggle.entity.Users;
 import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.security.jwt.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -18,13 +18,13 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String userId) throws UsernameNotFoundException {
 
-        Student student = studentRepository.findById(Integer.parseInt(userId))
+        Users user = studentRepository.findById(Long.parseLong(userId))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with ID: " + userId));
 
         return new CustomUserDetails(
-                student.getId(),
-                student.getEmail(),
-                student.getPassword(),
+                user.getId(),
+                user.getEmail(),
+                user.getPassword(),
                 null
         );
     }

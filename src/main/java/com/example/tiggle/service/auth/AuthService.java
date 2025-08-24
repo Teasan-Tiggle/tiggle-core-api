@@ -20,14 +20,14 @@ public interface AuthService {
      * @param studentId 학번
      * @return 중복 여부
      */
-    boolean checkDuplicateStudent(Integer universityId, String studentId);
+    boolean checkDuplicateStudent(Long universityId, String studentId);
 
     /**
      * 회원가입한다.
      *
      * @return 회원가입 성공 여부
      */
-    boolean joinUser(JoinRequestDto requestDto);
+    void joinUser(JoinRequestDto requestDto);
 
     /**
      * 로그인한다.

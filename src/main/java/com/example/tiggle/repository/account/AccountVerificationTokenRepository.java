@@ -1,7 +1,7 @@
 package com.example.tiggle.repository.account;
 
 import com.example.tiggle.entity.AccountVerificationToken;
-import com.example.tiggle.entity.Student;
+import com.example.tiggle.entity.Users;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,7 +16,7 @@ public interface AccountVerificationTokenRepository extends JpaRepository<Accoun
     
     Optional<AccountVerificationToken> findByVerificationToken(String verificationToken);
     
-    Optional<AccountVerificationToken> findByAccountNoAndStudentAndUsedFalse(String accountNo, Student student);
+    Optional<AccountVerificationToken> findByAccountNoAndUserAndUsedFalse(String accountNo, Users user);
     
     @Modifying
 @Query("DELETE FROM AccountVerificationToken a WHERE a.expiresAt < :now")

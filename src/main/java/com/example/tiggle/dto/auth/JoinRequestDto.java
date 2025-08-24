@@ -21,12 +21,12 @@ public class JoinRequestDto {
 
     @NotNull(message = "대학은 필수입니다.")
     @Schema(description = "대학교 ID", example = "1")
-    private Integer universityId;
+    private Long universityId;
 
 
     @NotNull(message = "학과는 필수입니다.")
     @Schema(description = "학과 ID", example = "1")
-    private Integer departmentId;
+    private Long departmentId;
 
 
     @NotBlank(message = "학번은 필수입니다.")

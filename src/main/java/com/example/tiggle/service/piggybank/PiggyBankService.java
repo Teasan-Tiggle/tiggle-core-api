@@ -10,12 +10,12 @@ import com.example.tiggle.dto.piggybank.response.PiggyBankSummaryResponse;
 import reactor.core.publisher.Mono;
 
 public interface PiggyBankService {
-    Mono<ApiResponse<PiggyBankResponse>> getMyPiggy(Integer userId);
-    Mono<ApiResponse<PiggyBankResponse>> updateSettings(Integer userId, UpdatePiggyBankSettingsRequest req);
-    Mono<ApiResponse<PiggyBankResponse>> setCategory(Integer userId, Long categoryId);
-    Mono<ApiResponse<PiggyBankResponse>> unsetCategory(Integer userId);
-    Mono<ApiResponse<PiggyBankSummaryResponse>> create(String encryptedUserKey, Integer userId, CreatePiggyBankRequest req);
-    Mono<ApiResponse<PiggyBankSummaryResponse>> getSummary(String encryptedUserKey, Integer userId);
-    Mono<ApiResponse<PiggyBankEntriesPageResponse>> getEntriesPage(String encryptedUserKey, Integer userId, PiggyBankEntriesPageRequest req);
+    Mono<ApiResponse<PiggyBankResponse>> getMyPiggy(Long userId);
+    Mono<ApiResponse<PiggyBankResponse>> updateSettings(Long userId, UpdatePiggyBankSettingsRequest req);
+    Mono<ApiResponse<PiggyBankResponse>> setCategory(Long userId, Long categoryId);
+    Mono<ApiResponse<PiggyBankResponse>> unsetCategory(Long userId);
+    Mono<ApiResponse<PiggyBankSummaryResponse>> create(String encryptedUserKey, Long userId, CreatePiggyBankRequest req);
+    Mono<ApiResponse<PiggyBankSummaryResponse>> getSummary(String encryptedUserKey, Long userId);
+    Mono<ApiResponse<PiggyBankEntriesPageResponse>> getEntriesPage(String encryptedUserKey, Long userId, PiggyBankEntriesPageRequest req);
 }
 
