@@ -18,7 +18,7 @@ spring:
           connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT:5000}
           timeout: ${MAIL_SMTP_TIMEOUT:5000}
           writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT:5000}
-  
+
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -35,12 +35,11 @@ spring:
 
   data:
     redis:
-      host: redis
-      port: 6379
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
 
 server:
   port: ${SERVER_PORT:8081}
-  url: ${SERVER_URL}
   forward-headers-strategy: native
 
 # Swagger 설정
@@ -53,11 +52,6 @@ springdoc:
     tags-sorter: alpha             # 태그 이름 순으로 정렬
   default-consumes-media-type: application/json
   default-produces-media-type: application/json
-
-# Mail 설정
-mail:
-  username: ${MAIL_USERNAME}
-  password: ${MAIL_PASSWORD}
 
 # SMS 설정
 sms:
