@@ -2,7 +2,6 @@ package com.example.tiggle.controller.dutchpay;
 
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.dutchpay.request.CreateDutchpayRequest;
-import com.example.tiggle.dto.dutchpay.response.DutchpayCreatedResponse;
 import com.example.tiggle.service.dutchpay.DutchpayService;
 import com.example.tiggle.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,9 +23,9 @@ public class DutchpayController {
 
     @PostMapping("/requests")
     @Operation(summary = "더치페이 요청 생성(저장 + FCM 발송)")
-    public ResponseEntity<ApiResponse<DutchpayCreatedResponse>> create(@Valid @RequestBody CreateDutchpayRequest req) {
+    public ResponseEntity<ApiResponse<Void>> create(@Valid @RequestBody CreateDutchpayRequest req) {
         Long creatorId = JwtUtil.getCurrentUserId();
-        var body = dutchpayService.create(creatorId, req);
-        return ResponseEntity.ok(body);
+        dutchpayService.create(creatorId, req);
+        return ResponseEntity.ok(ApiResponse.success());
     }
 }
