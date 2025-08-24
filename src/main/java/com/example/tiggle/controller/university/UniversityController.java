@@ -53,6 +53,8 @@ public class UniversityController {
     @Operation(summary = "학과 목록 조회", description = "회원가입 시 학과 목록을 조회합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "유효하지 않은 입력값"),
+            @ApiResponse(responseCode = "404", description = "대학 정보 없음"),
             @ApiResponse(responseCode = "500", description = "서버 에러")
     })
     public ResponseEntity<ResponseDto<List<DepartmentResponseDto>>> getDepartments(

@@ -2,8 +2,8 @@ package com.example.tiggle.service.university;
 
 import com.example.tiggle.dto.university.DepartmentResponseDto;
 import com.example.tiggle.dto.university.UniversityResponseDto;
-import com.example.tiggle.repository.user.DepartmentRepository;
-import com.example.tiggle.repository.user.UniversityRepository;
+import com.example.tiggle.repository.university.DepartmentRepository;
+import com.example.tiggle.repository.university.UniversityRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
