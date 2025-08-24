@@ -24,7 +24,7 @@ public class Dutchpay {
     private Long totalAmount;
 
     @Column(nullable=false)
-    private Boolean creatorPaysRemainder;
+    private Boolean payMore;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name="creator_id", nullable=false)

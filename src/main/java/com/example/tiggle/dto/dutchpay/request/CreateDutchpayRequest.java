@@ -8,5 +8,5 @@ public record CreateDutchpayRequest(
         @NotNull Long totalAmount,
         @NotBlank String title,
         String message,
-        @NotNull Boolean creatorPaysRemainder
+        @NotNull Boolean payMore
 ) { }
