@@ -46,3 +46,6 @@ src/main/resources/application-local.yml
 # SSH keys
 *.pem
 *.key
+
+# FCM
+tiggle-782d8-firebase-adminsdk-fbsvc-34d9f12553.json
