@@ -32,7 +32,7 @@ public class AccountController {
             @RequestBody OneWonVerificationRequest request) {
         
         String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         
         try {
             OneWonVerificationResponse response = accountService.sendOneWonVerification(encryptedUserKey, request.getAccountNo(), userId).block();

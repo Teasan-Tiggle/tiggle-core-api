@@ -1,7 +1,7 @@
 package com.example.tiggle.service.notification;
 
 import com.example.tiggle.dto.common.ApiResponse;
-import com.example.tiggle.entity.Student;
+import com.example.tiggle.entity.Users;
 import com.example.tiggle.repository.user.StudentRepository;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
@@ -72,45 +72,45 @@ public class FcmServiceImpl implements FcmService {
 
     @Override
     @Transactional
-    public ApiResponse<Void> registerFcmToken(Integer studentId, String fcmToken) {
+    public ApiResponse<Void> registerFcmToken(Long userId, String fcmToken) {
         try {
-            Student student = studentRepository.findById(studentId)
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다. id: " + studentId));
+            Users student = studentRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다. id: " + userId));
             
             student.setFcmToken(fcmToken);
             studentRepository.save(student);
             
-            log.info("FCM 토큰 등록에 성공했습니다 id: {}", studentId);
+            log.info("FCM 토큰 등록에 성공했습니다 id: {}", userId);
             return ApiResponse.success();
         } catch (Exception e) {
-            log.error("FCM 토큰 등록에 실패했습니다 id: {}", studentId, e);
+            log.error("FCM 토큰 등록에 실패했습니다 id: {}", userId, e);
             return ApiResponse.failure("FCM 토큰 등록에 실패했습니다. 토큰을 다시 확인해주세요.");
         }
     }
 
     @Override
     @Transactional
-    public void removeFcmToken(Integer studentId) {
+    public void removeFcmToken(Long userId) {
         try {
-            Student student = studentRepository.findById(studentId)
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다 id: " + studentId));
+            Users student = studentRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다 id: " + userId));
             
             student.setFcmToken(null);
             studentRepository.save(student);
             
-            log.info("FCM 토큰 삭제에 성공했습니다 id: {}", studentId);
+            log.info("FCM 토큰 삭제에 성공했습니다 id: {}", userId);
         } catch (Exception e) {
-            log.error("FCM 토큰 삭제에 실패했습니다 id: {}", studentId, e);
+            log.error("FCM 토큰 삭제에 실패했습니다 id: {}", userId, e);
         }
     }
 
     @Override
     @Async("fcmAsyncExecutor")
-    public CompletableFuture<Void> sendOneWonVerificationNotification(Integer userId, String accountNo, String authCode) {
+    public CompletableFuture<Void> sendOneWonVerificationNotification(Long userId, String accountNo, String authCode) {
         try {
             Thread.sleep(2000);
 
-            Student student = studentRepository.findById(userId).orElse(null);
+            Users student = studentRepository.findById(userId).orElse(null);
             if (student == null || student.getFcmToken() == null || student.getFcmToken().isEmpty()) {
                 log.warn("FCM 토큰이 없는 사용자입니다. userId: {}", userId);
                 return CompletableFuture.completedFuture(null);

@@ -26,7 +26,7 @@ public class FcmController {
     @Operation(summary = "FCM 토큰 등록", description = "사용자의 FCM 토큰을 등록/업데이트합니다.")
     public ResponseEntity<ApiResponse<Void>> registerFcmToken(
             @Valid @RequestBody FcmTokenRequest request) {
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
 
         try {
             ApiResponse<Void> response = fcmService.registerFcmToken(userId, request.getFcmToken());
@@ -40,7 +40,7 @@ public class FcmController {
     @PostMapping("/send")
     @Operation(summary = "FCM 알림 전송 테스트", description = "현재 로그인한 계정으로 FCM을 통해 푸시 알림을 전송합니다.")
     public ResponseEntity<ApiResponse<Void>> sendNotification() {
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         ApiResponse<Void> response = fcmTestService.sendNotificationWithData(userId);
 
         return ResponseEntity.ok(response);

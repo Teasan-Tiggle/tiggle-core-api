@@ -1,7 +1,7 @@
 package com.example.tiggle.service.notification;
 
 import com.example.tiggle.dto.common.ApiResponse;
-import com.example.tiggle.entity.Student;
+import com.example.tiggle.entity.Users;
 import com.example.tiggle.repository.user.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,8 +16,8 @@ public class FcmTestService {
     private final StudentRepository studentRepository;
     private final FcmService fcmService;
 
-    public ApiResponse<Void> sendNotificationWithData(Integer userId){
-        Student student = studentRepository.findById(userId)
+    public ApiResponse<Void> sendNotificationWithData(Long userId){
+        Users student = studentRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다. id: " + userId));
 
         String title = "FCM 알림 테스트 Title입니다.";

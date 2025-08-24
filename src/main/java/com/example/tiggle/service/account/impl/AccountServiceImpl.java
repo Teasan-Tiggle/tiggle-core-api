@@ -37,7 +37,7 @@ public class AccountServiceImpl implements AccountService {
     private final FcmService fcmService;
     
     @Override
-    public Mono<OneWonVerificationResponse> sendOneWonVerification(String encryptedUserKey, String accountNo, Integer userId) {
+    public Mono<OneWonVerificationResponse> sendOneWonVerification(String encryptedUserKey, String accountNo, Long userId) {
         String userKey = encryptionService.decrypt(encryptedUserKey);
         
         return financialApiService.openAccountAuth(userKey, accountNo, "티끌")
@@ -274,7 +274,7 @@ public class AccountServiceImpl implements AccountService {
         }
     }
     
-    private void getAuthCodeAndSendNotification(String encryptedUserKey, String accountNo, Integer userId) {
+    private void getAuthCodeAndSendNotification(String encryptedUserKey, String accountNo, Long userId) {
         CompletableFuture.runAsync(() -> {
             try {
                 String authCode = extractAuthCodeFromRecentTransactions(encryptedUserKey, accountNo);

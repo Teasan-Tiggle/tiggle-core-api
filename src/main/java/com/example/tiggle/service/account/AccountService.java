@@ -10,7 +10,7 @@ import reactor.core.publisher.Mono;
 
 public interface AccountService {
     
-    Mono<OneWonVerificationResponse> sendOneWonVerification(String encryptedUserKey, String accountNo, Integer userId);
+    Mono<OneWonVerificationResponse> sendOneWonVerification(String encryptedUserKey, String accountNo, Long userId);
     
     Mono<OneWonVerificationValidateResponse> validateOneWonAuth(String encryptedUserKey, String accountNo, String authCode, Long userId);
     

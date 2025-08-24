@@ -11,9 +11,9 @@ public interface FcmService {
     
     boolean sendNotificationWithData(String fcmToken, String title, String body, Map<String, String> data);
     
-    ApiResponse<Void> registerFcmToken(Integer studentId, String fcmToken);
+    ApiResponse<Void> registerFcmToken(Long userId, String fcmToken);
     
-    void removeFcmToken(Integer studentId);
+    void removeFcmToken(Long userId);
     
-    CompletableFuture<Void> sendOneWonVerificationNotification(Integer userId, String accountNo, String authCode);
+    CompletableFuture<Void> sendOneWonVerificationNotification(Long userId, String accountNo, String authCode);
 }
