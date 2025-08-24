@@ -12,6 +12,7 @@ import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.account.AccountService;
 import com.example.tiggle.service.account.AccountVerificationTokenService;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
+import com.example.tiggle.service.notification.FcmService;
 import com.example.tiggle.service.security.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,14 +33,16 @@ public class AccountServiceImpl implements AccountService {
     private final AccountVerificationTokenService tokenService;
     private final StudentRepository studentRepository;
     private final EncryptionService encryptionService;
+    private final FcmService fcmService;
     
     @Override
-    public Mono<OneWonVerificationResponse> sendOneWonVerification(String encryptedUserKey, String accountNo) {
+    public Mono<OneWonVerificationResponse> sendOneWonVerification(String encryptedUserKey, String accountNo, Integer userId) {
         String userKey = encryptionService.decrypt(encryptedUserKey);
         
         return financialApiService.openAccountAuth(userKey, accountNo, "티끌")
                 .map(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
+                        fcmService.sendOneWonVerificationNotification(userId, accountNo);
                         return OneWonVerificationResponse.success();
                     } else {
                         String errorMessage = response.getHeader() != null 

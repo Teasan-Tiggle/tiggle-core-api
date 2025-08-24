@@ -32,9 +32,10 @@ public class AccountController {
             @RequestBody OneWonVerificationRequest request) {
         
         String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
+        Integer userId = JwtUtil.getCurrentUserId();
         
         try {
-            OneWonVerificationResponse response = accountService.sendOneWonVerification(encryptedUserKey, request.getAccountNo()).block();
+            OneWonVerificationResponse response = accountService.sendOneWonVerification(encryptedUserKey, request.getAccountNo(), userId).block();
             return ResponseEntity.ok(response);
         } catch (Exception error) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
