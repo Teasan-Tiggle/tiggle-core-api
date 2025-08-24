@@ -62,7 +62,7 @@ public class FcmServiceImpl implements FcmService {
 
             Message message = messageBuilder.build();
             String response = FirebaseMessaging.getInstance().send(message);
-            log.info("FCM 메시지와 데이터가 성공적으로 전송되었습니다 FcmToken: {}", fcmToken);
+            log.info("FCM 메시지와 데이터가 성공적으로 전송되었습니다. title: {}, body: {}", title, body);
             return true;
         } catch (Exception e) {
             log.error("FCM 메시지와 데이터 전송에 실패했습니다: {}", fcmToken, e);
@@ -106,10 +106,10 @@ public class FcmServiceImpl implements FcmService {
 
     @Override
     @Async("fcmAsyncExecutor")
-    public CompletableFuture<Void> sendOneWonVerificationNotification(Integer userId, String accountNo) {
+    public CompletableFuture<Void> sendOneWonVerificationNotification(Integer userId, String accountNo, String authCode) {
         try {
-            Thread.sleep(3000);
-            
+            Thread.sleep(2000);
+
             Student student = studentRepository.findById(userId).orElse(null);
             if (student == null || student.getFcmToken() == null || student.getFcmToken().isEmpty()) {
                 log.warn("FCM 토큰이 없는 사용자입니다. userId: {}", userId);
@@ -118,29 +118,32 @@ public class FcmServiceImpl implements FcmService {
             
             Map<String, String> data = Map.of(
                     "type", "one_won_verification",
-                    "accountNo", accountNo
+                    "accountNo", accountNo,
+                    "authCode", authCode != null ? authCode : "인증번호 없음"
             );
+            
+            String title = "1원이 입금되었습니다.";
+            String body = authCode != null 
+                    ? String.format("%s", authCode)
+                    : "계좌 인증을 위한 1원 송금이 완료되었습니다. 입금 내역을 확인해주세요.";
             
             boolean success = sendNotificationWithData(
                     student.getFcmToken(), 
-                    "1원 송금 완료", 
-                    "계좌 인증을 위한 1원 송금이 완료되었습니다. 입금 내역을 확인해주세요.", 
+                    title,
+                    body,
                     data
             );
             
             if (success) {
-                log.info("3초 후 FCM 알림이 성공적으로 전송되었습니다. userId: {}", userId);
+                log.info("FCM 알림이 성공적으로 전송되었습니다. userId: {}, accountNo: {}, authCode: {}", userId, accountNo, authCode);
             } else {
                 log.error("FCM 알림 전송에 실패했습니다. userId: {}", userId);
             }
             
-        } catch (InterruptedException e) {
-            log.error("FCM 알림 지연 전송이 중단되었습니다. userId: {}", userId, e);
-            Thread.currentThread().interrupt();
         } catch (Exception e) {
-            log.error("FCM 알림 지연 전송 중 오류가 발생했습니다. userId: {}", userId, e);
+            log.error("FCM 알림 전송 중 오류가 발생했습니다. userId: {}", userId, e);
         }
-        
+
         return CompletableFuture.completedFuture(null);
     }
 }

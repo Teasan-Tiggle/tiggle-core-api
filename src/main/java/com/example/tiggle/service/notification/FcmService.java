@@ -15,5 +15,5 @@ public interface FcmService {
     
     void removeFcmToken(Integer studentId);
     
-    CompletableFuture<Void> sendOneWonVerificationNotification(Integer userId, String accountNo);
+    CompletableFuture<Void> sendOneWonVerificationNotification(Integer userId, String accountNo, String authCode);
 }
