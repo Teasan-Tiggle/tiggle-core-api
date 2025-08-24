@@ -4,23 +4,33 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
 import javax.annotation.PostConstruct;
-import java.io.FileInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 @Configuration
 @Slf4j
 public class FirebaseConfig {
 
+    @Value("${firebase.credentials:}")
+    private String firebaseCredentials;
+
     @PostConstruct
     public void initialize() {
         try {
-            FileInputStream serviceAccount = new FileInputStream("tiggle-782d8-firebase-adminsdk-fbsvc-34d9f12553.json");
+            GoogleCredentials credentials;
+            
+            // 환경변수에서 Firebase 인증 정보 사용
+            credentials = GoogleCredentials.fromStream(
+                new ByteArrayInputStream(firebaseCredentials.getBytes())
+            );
+            log.info("Firebase initialized with environment credentials");
 
             FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                    .setCredentials(credentials)
                     .build();
 
             if (FirebaseApp.getApps().isEmpty()) {
