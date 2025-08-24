@@ -86,7 +86,7 @@ public class AuthController {
             @Valid @RequestBody LoginRequestDto requestDto
     ) {
         Map<String, Object> loginResult = studentService.loginUser(requestDto.getEmail(), requestDto.getPassword());
-        Integer userId = (Integer) loginResult.get("userId");
+        Long userId = (Long) loginResult.get("userId");
         String encryptedUserKey = (String) loginResult.get("userKey");
 
         String accessToken = jwtTokenProvider.generateAccessToken(userId, encryptedUserKey);

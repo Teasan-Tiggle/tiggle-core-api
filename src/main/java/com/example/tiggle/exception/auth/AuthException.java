@@ -29,15 +29,15 @@ public class AuthException extends RuntimeException {
         return new AuthException("DUPLICATE_EMAIL", "이미 가입된 이메일입니다.");
     }
 
-    public static AuthException universityNotFound(Integer universityId) {
+    public static AuthException universityNotFound(Long universityId) {
         return new AuthException("UNIVERSITY_NOT_FOUND", "대학교를 찾을 수 없습니다: " + universityId);
     }
 
-    public static AuthException departmentNotFound(Integer departmentId) {
+    public static AuthException departmentNotFound(Long departmentId) {
         return new AuthException("DEPARTMENT_NOT_FOUND", "학과를 찾을 수 없습니다: " + departmentId);
     }
 
-    public static AuthException duplicateStudent(Integer universityId, String studentId) {
+    public static AuthException duplicateStudent(Long universityId, String studentId) {
         return new AuthException("DUPLICATE_STUDENT", "이미 가입된 학적 정보입니다: " + universityId + ", " + studentId);
     }
 

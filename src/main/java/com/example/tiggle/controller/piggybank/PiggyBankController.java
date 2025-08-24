@@ -27,7 +27,7 @@ public class PiggyBankController {
     @Operation(summary = "내 저금통 조회")
     @GetMapping
     public ResponseEntity<ApiResponse<PiggyBankResponse>> getMyPiggy() {
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         // 서비스에서 없으면 ResponseStatusException(404) 던짐 → 전역 핸들러가 그대로 내려줌
         ApiResponse<PiggyBankResponse> body = piggyBankService.getMyPiggy(userId).block();
         return ResponseEntity.ok(body);
@@ -38,7 +38,7 @@ public class PiggyBankController {
     public ResponseEntity<ApiResponse<PiggyBankResponse>> updateSettings(
             @Valid @RequestBody UpdatePiggyBankSettingsRequest request
     ) {
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         ApiResponse<PiggyBankResponse> body = piggyBankService.updateSettings(userId, request).block();
         return ResponseEntity.ok(body);
     }
@@ -46,7 +46,7 @@ public class PiggyBankController {
     @Operation(summary = "ESG 카테고리 설정")
     @PutMapping("/category/{categoryId}")
     public ResponseEntity<ApiResponse<PiggyBankResponse>> setCategory(@PathVariable Long categoryId) {
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         ApiResponse<PiggyBankResponse> body = piggyBankService.setCategory(userId, categoryId).block();
         return ResponseEntity.ok(body);
     }
@@ -54,7 +54,7 @@ public class PiggyBankController {
     @Operation(summary = "ESG 카테고리 해제")
     @DeleteMapping("/category")
     public ResponseEntity<ApiResponse<PiggyBankResponse>> unsetCategory() {
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         ApiResponse<PiggyBankResponse> body = piggyBankService.unsetCategory(userId).block();
         return ResponseEntity.ok(body);
     }
@@ -63,7 +63,7 @@ public class PiggyBankController {
     @GetMapping("/summary")
     public ResponseEntity<ApiResponse<PiggyBankSummaryResponse>> getSummary() {
         String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         ApiResponse<PiggyBankSummaryResponse> body = piggyBankService.getSummary(encryptedUserKey, userId).block();
         return ResponseEntity.ok(body);
     }
@@ -74,7 +74,7 @@ public class PiggyBankController {
             @Valid @RequestBody CreatePiggyBankRequest request
     ) {
         String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         ApiResponse<PiggyBankSummaryResponse> body = piggyBankService.create(encryptedUserKey, userId, request).block();
         return ResponseEntity.ok(body);
     }
@@ -85,7 +85,7 @@ public class PiggyBankController {
             @Valid @RequestBody PiggyBankEntriesPageRequest request
     ) {
         String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
-        Integer userId = JwtUtil.getCurrentUserId();
+        Long userId = JwtUtil.getCurrentUserId();
         ApiResponse<PiggyBankEntriesPageResponse> body =
                 piggyBankService.getEntriesPage(encryptedUserKey, userId, request).block();
         return ResponseEntity.ok(body);

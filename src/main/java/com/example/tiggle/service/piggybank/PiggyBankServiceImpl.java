@@ -9,7 +9,7 @@ import com.example.tiggle.dto.piggybank.request.UpdatePiggyBankSettingsRequest;
 import com.example.tiggle.dto.piggybank.response.*;
 import com.example.tiggle.entity.EsgCategory;
 import com.example.tiggle.entity.PiggyBank;
-import com.example.tiggle.entity.Student;
+import com.example.tiggle.entity.Users;
 import com.example.tiggle.repository.esg.EsgCategoryRepository;
 import com.example.tiggle.repository.piggybank.PiggyBankRepository;
 import com.example.tiggle.repository.user.StudentRepository;
@@ -43,7 +43,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
     private final EncryptionService encryptionService;
 
     @Override
-    public Mono<ApiResponse<PiggyBankResponse>> getMyPiggy(Integer userId) {
+    public Mono<ApiResponse<PiggyBankResponse>> getMyPiggy(Long userId) {
         return Mono.fromCallable(() ->
                         piggyBankRepository.findByOwner_Id(userId)
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다."))
@@ -53,7 +53,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
     }
 
     @Override
-    public Mono<ApiResponse<PiggyBankResponse>> updateSettings(Integer userId, UpdatePiggyBankSettingsRequest req) {
+    public Mono<ApiResponse<PiggyBankResponse>> updateSettings(Long userId, UpdatePiggyBankSettingsRequest req) {
         return Mono.fromCallable(() -> {
             PiggyBank piggy = piggyBankRepository.findByOwner_Id(userId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다. 먼저 생성해주세요."));
@@ -82,7 +82,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
     }
 
     @Override
-    public Mono<ApiResponse<PiggyBankResponse>> setCategory(Integer userId, Long categoryId) {
+    public Mono<ApiResponse<PiggyBankResponse>> setCategory(Long userId, Long categoryId) {
         return Mono.fromCallable(() -> {
             PiggyBank piggy = piggyBankRepository.findByOwner_Id(userId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다. 먼저 생성해주세요."));
@@ -99,7 +99,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
     }
 
     @Override
-    public Mono<ApiResponse<PiggyBankResponse>> unsetCategory(Integer userId) {
+    public Mono<ApiResponse<PiggyBankResponse>> unsetCategory(Long userId) {
         return Mono.fromCallable(() -> {
             PiggyBank piggy = piggyBankRepository.findByOwner_Id(userId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다. 먼저 생성해주세요."));
@@ -136,7 +136,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
 
     @Override
     @Transactional
-    public Mono<ApiResponse<PiggyBankSummaryResponse>> create(String encryptedUserKey, Integer userId, CreatePiggyBankRequest req) {
+    public Mono<ApiResponse<PiggyBankSummaryResponse>> create(String encryptedUserKey, Long userId, CreatePiggyBankRequest req) {
         String userKey = encryptionService.decrypt(encryptedUserKey);
         return Mono.fromCallable(() -> {
             // 1) 중복 방지
@@ -145,7 +145,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
             });
 
             // 2) 사용자 확인
-            Student owner = studentRepository.findById(userId)
+            Users owner = studentRepository.findById(userId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "사용자를 찾을 수 없습니다."));
 
             // 3) 금융 API: 예금계좌 생성
@@ -190,7 +190,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
     }
 
     @Override
-    public Mono<ApiResponse<PiggyBankSummaryResponse>> getSummary(String encryptedUserKey, Integer userId) {
+    public Mono<ApiResponse<PiggyBankSummaryResponse>> getSummary(String encryptedUserKey, Long userId) {
         return Mono.fromCallable(() ->
                 piggyBankRepository.findByOwner_Id(userId)
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다."))
@@ -210,7 +210,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
     }
 
     /** 지난주(월~일) 적립 합계 (입금 D 만 합산) — userKey는 평문 */
-    private Mono<BigDecimal> lastWeekSavedAmount(String userKeyPlain, String accountNo, Integer userId) {
+    private Mono<BigDecimal> lastWeekSavedAmount(String userKeyPlain, String accountNo, Long userId) {
         LocalDate today = LocalDate.now();
         LocalDate lastWeekStart = today.minusWeeks(1).with(DayOfWeek.MONDAY);
         LocalDate lastWeekEnd   = lastWeekStart.with(DayOfWeek.SUNDAY);
@@ -237,7 +237,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
                 });
     }
 
-    private boolean isUserSavingRecord(InquireTransactionHistoryListREC r, Integer userId) {
+    private boolean isUserSavingRecord(InquireTransactionHistoryListREC r, Long userId) {
         final String summary = r.getTransactionSummary() == null ? "" : r.getTransactionSummary();
         final String memo    = r.getTransactionMemo() == null ? "" : r.getTransactionMemo();
 
@@ -264,7 +264,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
 
     @Override
     public Mono<ApiResponse<PiggyBankEntriesPageResponse>> getEntriesPage(
-            String encryptedUserKey, Integer userId, PiggyBankEntriesPageRequest req) {
+            String encryptedUserKey, Long userId, PiggyBankEntriesPageRequest req) {
 
         return Mono.fromCallable(() ->
                 piggyBankRepository.findByOwner_Id(userId)

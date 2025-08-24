@@ -33,7 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtTokenProvider.getClaimsFromToken(jwt);
 
                 // 2. 클레임에서 userId와 암호화된 userKey 추출
-                int userId = claims.get("userId", Integer.class);
+                Long userId = claims.get("userId", Long.class);
                 String encryptedUserKey = claims.get("userKey", String.class);
 
                 // 3. UserDetailsService를 통해 사용자 정보 로드

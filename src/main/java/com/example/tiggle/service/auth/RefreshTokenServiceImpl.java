@@ -19,7 +19,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     public String reissueAccessToken(String refreshToken) {
         // 1. Refresh Token 유효성 검증
         Claims claims = jwtTokenProvider.getClaimsFromToken(refreshToken);
-        Integer userId = claims.get("userId", Integer.class);
+        Long userId = claims.get("userId", Long.class);
         if (userId == null) {
             throw new AuthException("INVALID_TOKEN", "토큰의 사용자 정보가 유효하지 않습니다.");
         }

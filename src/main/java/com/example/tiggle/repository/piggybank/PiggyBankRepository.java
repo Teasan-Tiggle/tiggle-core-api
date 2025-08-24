@@ -8,5 +8,5 @@ import java.util.Optional;
 
 public interface PiggyBankRepository extends JpaRepository<PiggyBank, Long> {
     @EntityGraph(attributePaths = "esgCategory")
-    Optional<PiggyBank> findByOwner_Id(Integer studentId);
+    Optional<PiggyBank> findByOwner_Id(Long studentId);
 }

@@ -1,10 +1,10 @@
 package com.example.tiggle.service.account;
 
-import com.example.tiggle.entity.Student;
+import com.example.tiggle.entity.Users;
 
 public interface AccountVerificationTokenService {
     
-    String generateVerificationToken(String accountNo, Student student);
+    String generateVerificationToken(String accountNo, Users user);
     
     boolean validateToken(String token);
     

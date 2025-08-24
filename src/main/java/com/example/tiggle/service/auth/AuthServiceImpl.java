@@ -3,7 +3,7 @@ package com.example.tiggle.service.auth;
 import com.example.tiggle.dto.finopenapi.response.UserResponse;
 import com.example.tiggle.dto.auth.JoinRequestDto;
 import com.example.tiggle.entity.Department;
-import com.example.tiggle.entity.Student;
+import com.example.tiggle.entity.Users;
 import com.example.tiggle.entity.University;
 import com.example.tiggle.exception.auth.AuthException;
 import com.example.tiggle.repository.university.DepartmentRepository;
@@ -41,13 +41,13 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public boolean checkDuplicateStudent(Integer universityId, String studentId) {
+    public boolean checkDuplicateStudent(Long universityId, String studentId) {
         return studentRepository.existsByUniversityIdAndStudentId(universityId, studentId);
     }
 
     @Override
     @Transactional
-    public boolean joinUser(JoinRequestDto requestDto) {
+    public void joinUser(JoinRequestDto requestDto) {
 
         // 1. DB 중복 체크
         if (checkDuplicateEmail(requestDto.getEmail())) {
@@ -87,19 +87,18 @@ public class AuthServiceImpl implements AuthService {
         String encodedPassword = passwordEncoder.encode(requestDto.getPassword());
 
         // 5. Student 엔티티 생성
-        Student student = new Student();
-        student.setEmail(requestDto.getEmail());
-        student.setPassword(encodedPassword);
-        student.setName(requestDto.getName());
-        student.setUniversity(university);
-        student.setDepartment(department);
-        student.setStudentId(requestDto.getStudentId());
-        student.setPhone(requestDto.getPhone());
+        Users user = new Users();
+        user.setEmail(requestDto.getEmail());
+        user.setPassword(encodedPassword);
+        user.setName(requestDto.getName());
+        user.setUniversity(university);
+        user.setDepartment(department);
+        user.setStudentId(requestDto.getStudentId());
+        user.setPhone(requestDto.getPhone());
 
         // 6. DB에 저장
         try {
-            studentRepository.save(student);
-            return true;
+            studentRepository.save(user);
         } catch (Exception e) {
             logger.error("사용자 정보 저장 실패: {}", requestDto.getEmail(), e);
             throw AuthException.externalApiFailure("DB 사용자 정보 저장 중 오류가 발생했습니다.", e);
@@ -109,11 +108,11 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public Map<String, Object> loginUser(String email, String password) {
         // 1. DB에서 사용자 찾기
-        Student student = studentRepository.findByEmail(email)
+        Users user = studentRepository.findByEmail(email)
                 .orElseThrow(AuthException::userNotFound);
 
         // 2. 비밀번호 일치 여부 확인
-        if (!passwordEncoder.matches(password, student.getPassword())) {
+        if (!passwordEncoder.matches(password, user.getPassword())) {
             throw AuthException.passwordMismatch();
         }
 
@@ -129,7 +128,7 @@ public class AuthServiceImpl implements AuthService {
 
             // 5. userId와 암호화된 userKey를 Map에 담아 반환
             Map<String, Object> result = new HashMap<>();
-            result.put("userId", student.getId());
+            result.put("userId", user.getId());
             result.put("userKey", encryptedUserKey);
             return result;
 
