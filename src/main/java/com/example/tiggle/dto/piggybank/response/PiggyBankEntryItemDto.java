@@ -1,11 +1,11 @@
-package com.example.tiggle.dto.piggy.response;
+package com.example.tiggle.dto.piggybank.response;
 
 import lombok.AllArgsConstructor; import lombok.Data;
 import java.math.BigDecimal; import java.time.OffsetDateTime;
 
 @Data
 @AllArgsConstructor
-public class PiggyEntryItemDto {
+public class PiggyBankEntryItemDto {
     private String id;
     private String type;           // "CHANGE" or "DUTCHPAY"
     private BigDecimal amount;

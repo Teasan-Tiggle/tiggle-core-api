@@ -1,4 +1,4 @@
-package com.example.tiggle.repository.piggy;
+package com.example.tiggle.repository.piggybank;
 
 import com.example.tiggle.entity.PiggyBank;
 import org.springframework.data.jpa.repository.EntityGraph;

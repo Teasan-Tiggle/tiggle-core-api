@@ -1,4 +1,4 @@
-package com.example.tiggle.dto.piggy.request;
+package com.example.tiggle.dto.piggybank.request;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;

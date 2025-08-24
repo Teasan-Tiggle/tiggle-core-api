@@ -1,7 +1,7 @@
-package com.example.tiggle.dto.piggy.request;
+package com.example.tiggle.dto.piggybank.request;
 import lombok.Data;
 @Data
-public class PiggyEntriesPageRequest {
+public class PiggyBankEntriesPageRequest {
     private String type;   // "TIGGLE" or "DUTCHPAY"
     private String cursor; // Base64(JSON)
     private Integer size;  // default 20, max 100

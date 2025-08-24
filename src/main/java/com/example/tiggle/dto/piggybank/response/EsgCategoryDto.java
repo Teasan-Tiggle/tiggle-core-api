@@ -1,4 +1,4 @@
-package com.example.tiggle.dto.piggy.response;
+package com.example.tiggle.dto.piggybank.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

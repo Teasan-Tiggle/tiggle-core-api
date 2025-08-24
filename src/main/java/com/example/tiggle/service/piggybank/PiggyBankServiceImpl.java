@@ -1,19 +1,25 @@
-package com.example.tiggle.service.piggy;
+package com.example.tiggle.service.piggybank;
 
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.finopenapi.response.InquireTransactionHistoryListREC;
 import com.example.tiggle.dto.finopenapi.response.InquireTransactionHistoryListResponse;
-import com.example.tiggle.dto.piggy.request.PiggyEntriesPageRequest;
-import com.example.tiggle.dto.piggy.response.PiggyEntriesPageResponse;
-import com.example.tiggle.dto.piggy.response.PiggyEntryItemDto;
-import com.example.tiggle.dto.piggy.response.PiggySummaryResponse;
-import com.example.tiggle.repository.piggy.PiggyBankRepository;
+import com.example.tiggle.dto.piggybank.request.CreatePiggyBankRequest;
+import com.example.tiggle.dto.piggybank.request.PiggyBankEntriesPageRequest;
+import com.example.tiggle.dto.piggybank.request.UpdatePiggyBankSettingsRequest;
+import com.example.tiggle.dto.piggybank.response.*;
+import com.example.tiggle.entity.EsgCategory;
+import com.example.tiggle.entity.PiggyBank;
+import com.example.tiggle.entity.Student;
+import com.example.tiggle.repository.esg.EsgCategoryRepository;
+import com.example.tiggle.repository.piggybank.PiggyBankRepository;
+import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
 import com.example.tiggle.service.security.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -24,20 +30,167 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
-import java.util.Base64;
-import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class PiggySummaryServiceImpl implements PiggySummaryService {
+public class PiggyBankServiceImpl implements PiggyBankService {
 
     private final PiggyBankRepository piggyBankRepository;
+    private final EsgCategoryRepository esgCategoryRepository;
+    private final StudentRepository studentRepository;
     private final FinancialApiService financialApiService;
-    private final EncryptionService encryptionService; // ★ 추가
+    private final EncryptionService encryptionService;
 
     @Override
-    public Mono<ApiResponse<PiggySummaryResponse>> getSummary(String encryptedUserKey, Integer userId) {
+    public Mono<ApiResponse<PiggyBankResponse>> getMyPiggy(Integer userId) {
+        return Mono.fromCallable(() ->
+                        piggyBankRepository.findByOwner_Id(userId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다."))
+                ).map(this::toResponse)
+                .map(ApiResponse::success)
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @Override
+    public Mono<ApiResponse<PiggyBankResponse>> updateSettings(Integer userId, UpdatePiggyBankSettingsRequest req) {
+        return Mono.fromCallable(() -> {
+            PiggyBank piggy = piggyBankRepository.findByOwner_Id(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다. 먼저 생성해주세요."));
+
+            if (req.getName() != null)          piggy.setName(req.getName());
+            if (req.getTargetAmount() != null)  piggy.setTargetAmount(req.getTargetAmount());
+            if (req.getAutoDonation() != null)  piggy.setAutoDonation(req.getAutoDonation());
+            if (req.getAutoSaving() != null)    piggy.setAutoSaving(req.getAutoSaving());
+
+            if (req.getEsgCategoryId() != null) {
+                if (req.getEsgCategoryId() <= 0) {
+                    piggy.setEsgCategory(null);
+                } else {
+                    EsgCategory cat = esgCategoryRepository.findById(req.getEsgCategoryId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "존재하지 않는 ESG 카테고리입니다."));
+                    piggy.setEsgCategory(cat);
+                }
+            }
+
+            piggyBankRepository.save(piggy);
+
+            PiggyBank reloaded = piggyBankRepository.findByOwner_Id(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다."));
+            return ApiResponse.success(toResponse(reloaded));
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @Override
+    public Mono<ApiResponse<PiggyBankResponse>> setCategory(Integer userId, Long categoryId) {
+        return Mono.fromCallable(() -> {
+            PiggyBank piggy = piggyBankRepository.findByOwner_Id(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다. 먼저 생성해주세요."));
+
+            EsgCategory cat = esgCategoryRepository.findById(categoryId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "존재하지 않는 ESG 카테고리입니다."));
+            piggy.setEsgCategory(cat);
+            piggyBankRepository.save(piggy);
+
+            PiggyBank reloaded = piggyBankRepository.findByOwner_Id(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다."));
+            return ApiResponse.success(toResponse(reloaded));
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @Override
+    public Mono<ApiResponse<PiggyBankResponse>> unsetCategory(Integer userId) {
+        return Mono.fromCallable(() -> {
+            PiggyBank piggy = piggyBankRepository.findByOwner_Id(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다. 먼저 생성해주세요."));
+
+            piggy.setEsgCategory(null);
+            piggyBankRepository.save(piggy);
+
+            PiggyBank reloaded = piggyBankRepository.findByOwner_Id(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다."));
+            return ApiResponse.success(toResponse(reloaded));
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private PiggyBankResponse toResponse(PiggyBank p) {
+        return new PiggyBankResponse(
+                p.getId(),
+                p.getName(),
+                p.getCurrentAmount(),
+                p.getTargetAmount(),
+                p.getSavingCount(),
+                p.getDonationCount(),
+                p.getDonationTotalAmount(),
+                p.getAutoDonation(),
+                p.getAutoSaving(),
+                p.getEsgCategory() == null ? null :
+                        new EsgCategoryDto(
+                                p.getEsgCategory().getId(),
+                                p.getEsgCategory().getName(),
+                                p.getEsgCategory().getDescription(),
+                                p.getEsgCategory().getCharacterName()
+                        )
+        );
+    }
+
+    @Override
+    @Transactional
+    public Mono<ApiResponse<PiggyBankSummaryResponse>> create(String encryptedUserKey, Integer userId, CreatePiggyBankRequest req) {
+        String userKey = encryptionService.decrypt(encryptedUserKey);
+        return Mono.fromCallable(() -> {
+            // 1) 중복 방지
+            piggyBankRepository.findByOwner_Id(userId).ifPresent(pb -> {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 개설된 저금통이 있습니다.");
+            });
+
+            // 2) 사용자 확인
+            Student owner = studentRepository.findById(userId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "사용자를 찾을 수 없습니다."));
+
+            // 3) 금융 API: 예금계좌 생성
+            var finRes = financialApiService.createDemandDepositAccount(userKey)
+                    .onErrorMap(e -> new ResponseStatusException(HttpStatus.BAD_GATEWAY, "금융API 호출 실패", e))
+                    .block();
+
+            if (finRes == null || finRes.getHeader() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "금융API 응답이 올바르지 않습니다.");
+            }
+            if (!"H0000".equals(finRes.getHeader().getResponseCode())) {
+                String msg = finRes.getHeader().getResponseMessage();
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "금융 계좌 개설 실패: " + (msg != null ? msg : "알 수 없는 오류"));
+            }
+
+            String createdAccountNo = finRes.getRec() != null ? finRes.getRec().getAccountNo() : null;
+            if (createdAccountNo == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "생성된 계좌번호가 누락되었습니다.");
+            }
+            log.info("[Piggy][Create] userId={}, createdAccountNo={}", userId, createdAccountNo);
+
+            PiggyBank pb = PiggyBank.builder()
+                    .owner(owner)
+                    .name(req.getName())
+                    .targetAmount(req.getTargetAmount())
+                    .accountNo(createdAccountNo)
+                    .build();
+
+            if (req.getEsgCategoryId() != null) {
+                EsgCategory cat = esgCategoryRepository.findById(req.getEsgCategoryId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "ESG 카테고리를 찾을 수 없습니다."));
+                pb.setEsgCategory(cat);
+            }
+
+            PiggyBank saved = piggyBankRepository.save(pb);
+
+            PiggyBankSummaryResponse body =
+                    new PiggyBankSummaryResponse(saved.getName(), saved.getCurrentAmount(), BigDecimal.ZERO);
+
+            return ApiResponse.success(body);
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @Override
+    public Mono<ApiResponse<PiggyBankSummaryResponse>> getSummary(String encryptedUserKey, Integer userId) {
         return Mono.fromCallable(() ->
                 piggyBankRepository.findByOwner_Id(userId)
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "저금통이 없습니다."))
@@ -51,7 +204,7 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
 
             return lastWeekSavedAmount(userKey, piggy.getAccountNo(), userId)
                     .map(lastWeek -> ApiResponse.success(
-                            new PiggySummaryResponse(piggy.getName(), piggy.getCurrentAmount(), lastWeek)
+                            new PiggyBankSummaryResponse(piggy.getName(), piggy.getCurrentAmount(), lastWeek)
                     ));
         }).subscribeOn(Schedulers.boundedElastic());
     }
@@ -110,8 +263,8 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
     }
 
     @Override
-    public Mono<ApiResponse<PiggyEntriesPageResponse>> getEntriesPage(
-            String encryptedUserKey, Integer userId, PiggyEntriesPageRequest req) {
+    public Mono<ApiResponse<PiggyBankEntriesPageResponse>> getEntriesPage(
+            String encryptedUserKey, Integer userId, PiggyBankEntriesPageRequest req) {
 
         return Mono.fromCallable(() ->
                 piggyBankRepository.findByOwner_Id(userId)
@@ -156,8 +309,8 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
 
                         ZoneOffset offset = ZoneId.systemDefault().getRules().getOffset(Instant.now());
 
-                        List<PiggyEntryItemDto> items = page.stream().map(tx ->
-                                new PiggyEntryItemDto(
+                        List<PiggyBankEntryItemDto> items = page.stream().map(tx ->
+                                new PiggyBankEntryItemDto(
                                         tx.id,
                                         standard,
                                         tx.amount,
@@ -166,11 +319,11 @@ public class PiggySummaryServiceImpl implements PiggySummaryService {
                                 )
                         ).toList();
 
-                        return ApiResponse.success(new PiggyEntriesPageResponse(items, nextCursor, items.size(), hasNext));
+                        return ApiResponse.success(new PiggyBankEntriesPageResponse(items, nextCursor, items.size(), hasNext));
                     })
                     .onErrorResume(e -> {
                         log.error("[Piggy][EntriesPage] 조회 실패", e);
-                        return Mono.just(ApiResponse.success(new PiggyEntriesPageResponse(List.of(), null, 0, false)));
+                        return Mono.just(ApiResponse.success(new PiggyBankEntriesPageResponse(List.of(), null, 0, false)));
                     });
         }).subscribeOn(Schedulers.boundedElastic());
     }
