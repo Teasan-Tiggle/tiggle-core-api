@@ -12,6 +12,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.stream.Collectors;
 
@@ -89,5 +91,28 @@ public class GlobalExceptionHandler {
         ErrorResponse error = new ErrorResponse(false, "서버 처리 중 오류가 발생했습니다, 잠시 후 다시 시도해주세요.");
 
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    // 서비스에서 throw한 ResponseStatusException을 그대로 전달
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException e) {
+        HttpStatus status = HttpStatus.valueOf(e.getStatusCode().value());
+        String msg = (e.getReason() != null) ? e.getReason() : "요청을 처리할 수 없습니다.";
+        return ResponseEntity.status(status)
+                .body(new ErrorResponse(false, msg));
+    }
+
+    // 잘못된 파라미터 등 클라이언트 오류를 400으로
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException e) {
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse(false, e.getMessage()));
+    }
+
+    // 외부 금융 API(WebClient) 오류를 게이트웨이 오류로 래핑
+    @ExceptionHandler(WebClientResponseException.class)
+    public ResponseEntity<ErrorResponse> handleWebClient(WebClientResponseException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(new ErrorResponse(false, "외부 금융 API 오류(" + e.getStatusCode().value() + ")"));
     }
 }
