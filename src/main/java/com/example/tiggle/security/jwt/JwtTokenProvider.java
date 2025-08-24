@@ -30,7 +30,7 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
-    public String generateAccessToken(int userId, String encryptedUserKey) {
+    public String generateAccessToken(Long userId, String encryptedUserKey) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + accessTokenExpirationTime);
 
@@ -43,7 +43,7 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public String generateRefreshToken(int userId) {
+    public String generateRefreshToken(Long userId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + refreshTokenExpirationTime);
 

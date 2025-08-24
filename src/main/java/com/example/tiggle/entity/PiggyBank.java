@@ -35,7 +35,7 @@ public class PiggyBank {
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "student_id", nullable = false, unique = true,
             foreignKey = @ForeignKey(name = "fk_piggy_bank_student"))
-    private Student owner;
+    private Users owner;
 
     @Column(name = "account_no", length = 30)
     private String accountNo;

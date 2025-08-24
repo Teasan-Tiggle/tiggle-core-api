@@ -86,7 +86,7 @@ public class AuthController {
             @Valid @RequestBody LoginRequestDto requestDto
     ) {
         Map<String, Object> loginResult = studentService.loginUser(requestDto.getEmail(), requestDto.getPassword());
-        Integer userId = (Integer) loginResult.get("userId");
+        Long userId = (Long) loginResult.get("userId");
         String encryptedUserKey = (String) loginResult.get("userKey");
 
         String accessToken = jwtTokenProvider.generateAccessToken(userId, encryptedUserKey);
@@ -114,6 +114,7 @@ public class AuthController {
     @Operation(summary = "로그아웃", description = "사용자 로그아웃을 처리합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "로그아웃 성공"),
+            @ApiResponse(responseCode = "403", description = "권한 없음 (유효하지 않은 토큰)"),
             @ApiResponse(responseCode = "500", description = "서버 에러")
     })
     public ResponseEntity<ResponseDto<Void>> logout() {
@@ -142,7 +143,7 @@ public class AuthController {
     @Operation(summary = "액세스 토큰 재발급", description = "리프레시 토큰을 사용하여 새로운 액세스 토큰을 발급합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "액세스 토큰 재발급 성공"),
-            @ApiResponse(responseCode = "401", description = "유효하지 않은 리프레시 토큰"),
+            @ApiResponse(responseCode = "403", description = "권한 없음 (유효하지 않은 토큰)"),
             @ApiResponse(responseCode = "500", description = "서버 에러")
     })
     public ResponseEntity<ResponseDto<Void>> refresh(HttpServletRequest request) {

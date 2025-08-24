@@ -3,11 +3,10 @@ package com.example.tiggle.controller.auth;
 import com.example.tiggle.dto.ResponseDto;
 import com.example.tiggle.dto.auth.EmailSendRequestDto;
 import com.example.tiggle.dto.auth.EmailVerifyRequestDto;
-import com.example.tiggle.service.auth.EmailAuthService;
 import com.example.tiggle.service.auth.AuthService;
+import com.example.tiggle.service.auth.EmailAuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,8 +35,9 @@ public class EmailAuthController {
     @PostMapping("/send")
     @Operation(summary = "이메일 인증코드 전송", description = "입력한 이메일 주소로 인증코드를 전송합니다.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "인증 번호 전송 결과 반환"),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (이메일 누락)", content = @Content)
+            @ApiResponse(responseCode = "200", description = "전송 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류"),
+            @ApiResponse(responseCode = "500", description = "서버 에러")
     })
     public ResponseEntity<?> sendEmail(
             @Parameter(description = "이메일 정보 (JSON 형식)", required = true)
@@ -60,8 +60,9 @@ public class EmailAuthController {
     @PostMapping("/verify")
     @Operation(summary = "이메일 인증코드 검증", description = "입력한 이메일과 인증코드를 검증합니다.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "이메일 인증 결과 반환"),
-            @ApiResponse(responseCode = "400", description = "요청 형식 오류 (이메일 또는 코드 누락)", content = @Content)
+            @ApiResponse(responseCode = "200", description = "검증 성공"),
+            @ApiResponse(responseCode = "400", description = "요청 형식 오류"),
+            @ApiResponse(responseCode = "500", description = "서버 에러")
     })
     public ResponseEntity<ResponseDto<Void>> verifyCode(
             @Parameter(description = "이메일 인증코드 정보 (JSON 형식)", required = true)

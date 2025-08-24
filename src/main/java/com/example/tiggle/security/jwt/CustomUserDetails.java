@@ -12,12 +12,12 @@ import java.util.Collections;
 @Setter
 public class CustomUserDetails implements UserDetails {
 
-    private final int userId;
+    private final Long userId;
     private final String username; // email
     private final String password;
     private String encryptedUserKey;
 
-    public CustomUserDetails(int userId, String username, String password, String encryptedUserKey) {
+    public CustomUserDetails(Long userId, String username, String password, String encryptedUserKey) {
         this.userId = userId;
         this.username = username;
         this.password = password;

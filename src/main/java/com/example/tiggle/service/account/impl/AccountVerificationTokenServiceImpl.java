@@ -1,7 +1,7 @@
 package com.example.tiggle.service.account.impl;
 
 import com.example.tiggle.entity.AccountVerificationToken;
-import com.example.tiggle.entity.Student;
+import com.example.tiggle.entity.Users;
 import com.example.tiggle.repository.account.AccountVerificationTokenRepository;
 import com.example.tiggle.service.account.AccountVerificationTokenService;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +23,9 @@ public class AccountVerificationTokenServiceImpl implements AccountVerificationT
     private static final int TOKEN_EXPIRY_MINUTES = 30;
     
     @Override
-    public String generateVerificationToken(String accountNo, Student student) {
+    public String generateVerificationToken(String accountNo, Users user) {
         Optional<AccountVerificationToken> existingToken =
-                tokenRepository.findByAccountNoAndStudentAndUsedFalse(accountNo, student);
+                tokenRepository.findByAccountNoAndUserAndUsedFalse(accountNo, user);
         
         if (existingToken.isPresent() && existingToken.get().isValid()) {
             return existingToken.get().getVerificationToken();
@@ -34,11 +34,11 @@ public class AccountVerificationTokenServiceImpl implements AccountVerificationT
         String token = UUID.randomUUID().toString();
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(TOKEN_EXPIRY_MINUTES);
         
-        AccountVerificationToken verificationToken = new AccountVerificationToken(accountNo, token, student, expiresAt);
+        AccountVerificationToken verificationToken = new AccountVerificationToken(accountNo, token, user, expiresAt);
         
         tokenRepository.save(verificationToken);
         
-        log.info("계좌 인증 토큰 생성 완료 - 계좌번호: {}, 사용자ID: {}", accountNo, student.getId());
+        log.info("계좌 인증 토큰 생성 완료 - 계좌번호: {}, 사용자ID: {}", accountNo, user.getId());
         return token;
     }
     
