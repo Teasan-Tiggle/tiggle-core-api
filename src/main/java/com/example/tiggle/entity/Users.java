@@ -39,6 +39,9 @@ public class Users {
     @Column(name = "user_key", unique = true)
     private String userKey;
 
+    @Column(name = "fcm_token", length = 255)
+    private String fcmToken;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id", nullable = false)
     private University university;

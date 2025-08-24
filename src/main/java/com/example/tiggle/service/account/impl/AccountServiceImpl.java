@@ -12,6 +12,7 @@ import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.account.AccountService;
 import com.example.tiggle.service.account.AccountVerificationTokenService;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
+import com.example.tiggle.service.notification.FcmService;
 import com.example.tiggle.service.security.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,14 +34,16 @@ public class AccountServiceImpl implements AccountService {
     private final AccountVerificationTokenService tokenService;
     private final StudentRepository studentRepository;
     private final EncryptionService encryptionService;
+    private final FcmService fcmService;
     
     @Override
-    public Mono<OneWonVerificationResponse> sendOneWonVerification(String encryptedUserKey, String accountNo) {
+    public Mono<OneWonVerificationResponse> sendOneWonVerification(String encryptedUserKey, String accountNo, Long userId) {
         String userKey = encryptionService.decrypt(encryptedUserKey);
         
         return financialApiService.openAccountAuth(userKey, accountNo, "티끌")
                 .map(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
+                        getAuthCodeAndSendNotification(encryptedUserKey, accountNo, userId);
                         return OneWonVerificationResponse.success();
                     } else {
                         String errorMessage = response.getHeader() != null 
@@ -267,6 +271,46 @@ public class AccountServiceImpl implements AccountService {
         } else {
             return allTransactions.stream()
                     .anyMatch(t -> Long.parseLong(t.getTransactionId()) > Long.parseLong(cursor));
+        }
+    }
+    
+    private void getAuthCodeAndSendNotification(String encryptedUserKey, String accountNo, Long userId) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                String authCode = extractAuthCodeFromRecentTransactions(encryptedUserKey, accountNo);
+                fcmService.sendOneWonVerificationNotification(userId, accountNo, authCode);
+            } catch (Exception e) {
+                log.error("인증 코드 추출 중 오류 발생. 기본 알림 전송. userId: {}", userId, e);
+                fcmService.sendOneWonVerificationNotification(userId, accountNo, null);
+            }
+        });
+    }
+    
+    private String extractAuthCodeFromRecentTransactions(String encryptedUserKey, String accountNo) {
+        try {
+            String userKey = encryptionService.decrypt(encryptedUserKey);
+
+            LocalDate today = LocalDate.now();
+            String todayStr = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+            return financialApiService.inquireTransactionHistoryList(
+                            userKey, accountNo, todayStr, todayStr, "M", "DESC")
+                    .mapNotNull(response -> {
+                        if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
+                            return response.getRec().getList().stream()
+                                    .filter(transaction -> "1".equals(transaction.getTransactionBalance()))
+                                    .filter(transaction -> transaction.getTransactionSummary() != null &&
+                                            transaction.getTransactionSummary().contains("티끌"))
+                                    .findFirst()
+                                    .map(transaction -> transaction.getTransactionSummary())
+                                    .orElse(null);
+                        }
+                        return null;
+                    })
+                    .block();
+        } catch (Exception e) {
+            log.error("거래 내역 조회 중 오류 발생", e);
+            return null;
         }
     }
 }
