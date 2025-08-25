@@ -56,6 +56,24 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 기부 관련 예외 처리
+     */
+    @ExceptionHandler(DonationException.class)
+    public ResponseEntity<ErrorResponse> handleDonationException(DonationException e) {
+
+        logger.error("기부 관련 오류: {} (코드: {})", e.getMessage(), e.getErrorCode());
+
+        HttpStatus status = switch (e.getErrorCode()) {
+            case "USER_ACCOUNT_NOT_FOUND", "UNIVERSITY_ACCOUNT_NOT_FOUND", "ACCOUNT_BALANCE_LACK" -> HttpStatus.BAD_REQUEST;
+            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
+
+        ErrorResponse response = new ErrorResponse(false, e.getMessage());
+
+        return new ResponseEntity<>(response, status);
+    }
+
+    /**
      * 잘못된 요청 : 요청 본문 검증 실패 시
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
