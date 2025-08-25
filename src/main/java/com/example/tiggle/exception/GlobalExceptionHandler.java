@@ -1,5 +1,6 @@
 package com.example.tiggle.exception;
 
+import com.example.tiggle.exception.account.AccountException;
 import com.example.tiggle.exception.auth.AuthException;
 import com.example.tiggle.exception.auth.MailSendException;
 import org.slf4j.Logger;
@@ -35,6 +36,27 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 계좌 관련 예외 처리
+     */
+    @ExceptionHandler(AccountException.class)
+    public ResponseEntity<ErrorResponse> handleAccountException(AccountException e) {
+
+        logger.error("계좌 관련 오류: {} (코드: {})", e.getMessage(), e.getErrorCode(), e);
+
+        HttpStatus status = switch (e.getErrorCode()) {
+            case "INVALID_ACCOUNT_NO", "ACCOUNT_NOT_FOUND", "INVALID_AUTH_CODE", 
+                    "VERIFICATION_FAILED", "INVALID_VERIFICATION_TOKEN" -> HttpStatus.BAD_REQUEST;
+            case "PRIMARY_ACCOUNT_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            case "EXTERNAL_API_FAILURE", "BANK_API_ERROR" -> HttpStatus.BAD_GATEWAY;
+            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
+
+        ErrorResponse response = new ErrorResponse(false, e.getMessage());
+
+        return new ResponseEntity<>(response, status);
+    }
+
+    /**
      * 유저 인증 관련 예외 처리
      */
     @ExceptionHandler(AuthException.class)
@@ -43,10 +65,12 @@ public class GlobalExceptionHandler {
         logger.error("사용자 인증/인가 오류: {} (코드: {})", e.getMessage(), e.getErrorCode(), e);
 
         HttpStatus status = switch (e.getErrorCode()) {
-            case "USER_NOT_FOUND", "PASSWORD_MISMATCH" -> HttpStatus.UNAUTHORIZED;
+            case "USER_NOT_FOUND", "PASSWORD_MISMATCH", "JWT_EXPIRED", "JWT_UNSUPPORTED",
+                    "JWT_MALFORMED", "JWT_SIGNATURE_INVALID", "JWT_ILLEGAL_ARGUMENT", "INVALID_TOKEN",
+                    "REFRESH_TOKEN_NOT_FOUND", "REFRESH_TOKEN_MISMATCH", "USER_KEY_NOT_FOUND" -> HttpStatus.UNAUTHORIZED;
             case "DUPLICATE_EMAIL", "DUPLICATE_STUDENT_ID" -> HttpStatus.CONFLICT;
             case "UNIVERSITY_NOT_FOUND", "DEPARTMENT_NOT_FOUND" -> HttpStatus.BAD_REQUEST;
-            case "EXTERNAL_API_FAILURE", "EXTERNAL_API_USER_CREATION_FAILURE", "EXTERNAL_API_USER_NOT_FOUND" -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case "EXTERNAL_API_FAILURE", "EXTERNAL_API_USER_CREATION_FAILURE", "EXTERNAL_API_USER_NOT_FOUND" -> HttpStatus.BAD_GATEWAY;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
 

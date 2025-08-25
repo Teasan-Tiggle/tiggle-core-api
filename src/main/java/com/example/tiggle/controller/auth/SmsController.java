@@ -1,7 +1,7 @@
 package com.example.tiggle.controller.auth;
 
 import com.example.tiggle.dto.ResponseDto;
-import com.example.tiggle.service.SmsService;
+import com.example.tiggle.service.sms.SmsService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;

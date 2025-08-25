@@ -1,4 +1,4 @@
-package com.example.tiggle.service;
+package com.example.tiggle.service.sms;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
