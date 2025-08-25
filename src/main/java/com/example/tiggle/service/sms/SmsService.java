@@ -1,4 +1,4 @@
-package com.example.tiggle.service;
+package com.example.tiggle.service.sms;
 
 import com.example.tiggle.config.SmsProps;
 import net.nurigo.sdk.message.model.Message;
