@@ -3,6 +3,7 @@ package com.example.tiggle.service.donation;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
 import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
+import com.example.tiggle.dto.donation.response.DonationGrowthLevel;
 import com.example.tiggle.dto.donation.response.DonationStatus;
 import com.example.tiggle.entity.DonationHistory;
 import com.example.tiggle.entity.EsgCategory;
@@ -234,5 +235,23 @@ public class DonationServiceImpl implements DonationService {
                 map.get("People"),
                 map.get("Prosperity")
         );
+    }
+
+    @Override
+    public DonationGrowthLevel getDonationGrowthLevel(Long userId) {
+
+        final int LEVEL_AMOUNT = 5_000;
+
+        // 1. 총 기부금액 조회
+        BigDecimal totalAmountBD = donationHistoryRepository.findTotalAmountByUserId(userId);
+        Long totalAmount = totalAmountBD != null ? totalAmountBD.longValue() : 0L;
+
+        // 2. 레벨 계산
+        int level = (int) (totalAmount / LEVEL_AMOUNT);
+
+        // 3. 다음 레벨까지 남은 금액
+        long toNextLevel = LEVEL_AMOUNT - (totalAmount % LEVEL_AMOUNT);
+
+        return new DonationGrowthLevel(totalAmount, toNextLevel, level);
     }
 }

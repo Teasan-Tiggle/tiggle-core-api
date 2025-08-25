@@ -3,6 +3,7 @@ package com.example.tiggle.controller.donation;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
 import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
+import com.example.tiggle.dto.donation.response.DonationGrowthLevel;
 import com.example.tiggle.dto.donation.response.DonationStatus;
 import com.example.tiggle.service.donation.DonationService;
 import com.example.tiggle.util.JwtUtil;
@@ -112,6 +113,21 @@ public class DonationController {
     })
     public ResponseEntity<ApiResponse<DonationStatus>> getTotalStatus() {
         DonationStatus response = donationService.getTotalDonationStatus();
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 나의 성장 조회
+     *
+     * @return 기부 현황
+     */
+    @GetMapping("/growth")
+    @Operation(summary = "나의 성장 조회", description = "나의 기부금액과 레벨을 조회합니다.")
+    @ApiResponses(value = {
+    })
+    public ResponseEntity<ApiResponse<DonationGrowthLevel>> getGrowth() {
+        Long userId = JwtUtil.getCurrentUserId();
+        DonationGrowthLevel response = donationService.getDonationGrowthLevel(userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

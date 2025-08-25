@@ -3,6 +3,7 @@ package com.example.tiggle.service.donation;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
 import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
+import com.example.tiggle.dto.donation.response.DonationGrowthLevel;
 import com.example.tiggle.dto.donation.response.DonationStatus;
 import reactor.core.publisher.Mono;
 
@@ -18,4 +19,6 @@ public interface DonationService {
     DonationStatus getUniversityDonationStatus(Long userId);
 
     DonationStatus getTotalDonationStatus();
+
+    DonationGrowthLevel getDonationGrowthLevel(Long userId);
 }
