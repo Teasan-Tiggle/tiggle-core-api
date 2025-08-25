@@ -41,9 +41,7 @@ public class DutchpayReadService {
                 p.getCreatedAt(),
                 rounded,                 // 내가 내는 금액(올림값)
                 original,                // 원래 금액
-                tiggle,                  // 티끌
-                p.getPayMore() != null && p.getPayMore(),
-                isCreator
+                tiggle                  // 티끌
         );
 
         return new ResponseDto<>(true, data);

@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
@@ -33,11 +32,16 @@ public class UserQueryController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
         }
 
-        var list = usersRepository.findAll().stream()
-                .map(u -> new UserSimpleResponse(u.getId(), u.getName()))
-                .collect(Collectors.toList());
+        var users = usersRepository.findAllWithSchoolAndDeptExcluding(requesterId);
+        var list = users.stream()
+                .map(u -> new UserSimpleResponse(
+                        u.getId(),
+                        u.getName(),
+                        u.getUniversity() != null ? u.getUniversity().getName() : null,
+                        u.getDepartment() != null ? u.getDepartment().getName() : null
+                ))
+                .toList();
 
         return ResponseEntity.ok(new ResponseDto<>(true, list));
     }
-
 }

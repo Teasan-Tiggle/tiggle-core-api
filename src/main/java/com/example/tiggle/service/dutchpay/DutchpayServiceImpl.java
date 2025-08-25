@@ -28,7 +28,7 @@ public class DutchpayServiceImpl implements DutchpayService {
 
     @Override
     @Transactional
-    public void create(Long creatorId, CreateDutchpayRequest req) {
+    public void create(String encryptedUserKey, Long creatorId, CreateDutchpayRequest req) {
         Users creator = userRepo.findById(creatorId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "사용자 없음"));
 
@@ -88,10 +88,15 @@ public class DutchpayServiceImpl implements DutchpayService {
         }
         shareRepo.saveAll(shares);
 
-        // 커밋 후 FCM 발송
+        // 커밋 후 FCM/자동저금 트리거
         eventPublisher.publishEvent(new DutchpayCreatedEvent(
-                d.getId(), d.getTitle(), d.getMessage(),
-                d.getTotalAmount(), creator.getId(), shareMap
+                d.getId(),
+                d.getTitle(),
+                d.getMessage(),
+                d.getTotalAmount(),
+                creator.getId(),
+                shareMap,
+                encryptedUserKey
         ));
     }
 }

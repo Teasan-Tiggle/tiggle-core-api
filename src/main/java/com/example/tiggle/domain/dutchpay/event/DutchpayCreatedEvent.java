@@ -8,5 +8,6 @@ public record DutchpayCreatedEvent(
         String message,
         Long totalAmount,
         Long creatorId,
-        Map<Long, Long> userShareMap // userId -> amount
+        Map<Long, Long> userShareMap,
+        String encryptedUserKey
 ) {}

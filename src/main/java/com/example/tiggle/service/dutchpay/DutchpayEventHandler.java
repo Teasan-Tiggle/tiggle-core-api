@@ -1,7 +1,9 @@
 package com.example.tiggle.service.dutchpay;
 
 import com.example.tiggle.domain.dutchpay.event.DutchpayCreatedEvent;
+import com.example.tiggle.repository.dutchpay.DutchpayRepository;
 import com.example.tiggle.repository.user.StudentRepository;
+import com.example.tiggle.service.account.AccountService;
 import com.example.tiggle.service.notification.FcmService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,8 @@ public class DutchpayEventHandler {
 
     private final StudentRepository userRepo;
     private final FcmService fcmService;
+    private final AccountService accountService;
+    private final DutchpayRepository dutchpayRepository;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDutchpayCreated(DutchpayCreatedEvent e) {
@@ -46,16 +50,29 @@ public class DutchpayEventHandler {
             data.put("amountToPay", String.valueOf(amountToPay));
             data.put("link", "tiggle://dutchpay/" + e.dutchpayId());
 
-            boolean ok = fcmService.sendNotificationWithData(
-                    token,
-                    notiTitle,
-                    notiBody,
-                    data
-            );
+            boolean ok = fcmService.sendNotificationWithData(token, notiTitle, notiBody, data);
+            if (!ok) log.warn("더치페이 FCM 전송 실패 userId={}, dutchpayId={}", userId, e.dutchpayId());
+        }
 
-            if (!ok) {
-                log.warn("더치페이 FCM 전송 실패 userId={}, dutchpayId={}", userId, e.dutchpayId());
-            }
+        try {
+            Boolean payMore = dutchpayRepository.findPayMoreById(e.dutchpayId());
+            long creatorOriginal = e.userShareMap().getOrDefault(e.creatorId(), 0L);
+
+            String encryptedUserKey = e.encryptedUserKey();
+
+            accountService.transferTiggleIfPayMore(
+                            encryptedUserKey,
+                            e.creatorId(),
+                            e.dutchpayId(),
+                            creatorOriginal,
+                            Boolean.TRUE.equals(payMore)
+                    )
+                    .doOnError(err -> log.warn("생성자 티끌 자동저금 실패 userId={}, dutchpayId={}, msg={}",
+                            e.creatorId(), e.dutchpayId(), err.getMessage()))
+                    .subscribe();
+
+        } catch (Exception ex) {
+            log.warn("생성자 자동저금 트리거 중 예외 dutchpayId={}, msg={}", e.dutchpayId(), ex.getMessage());
         }
     }
 }
