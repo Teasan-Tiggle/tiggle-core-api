@@ -15,7 +15,5 @@ public record DutchpayDetailData(
         LocalDateTime requestedAt,
         Long myAmount,          // 100원 단위 올림된 "내가 내는 금액"
         Long originalAmount,    // 올림 전 금액(예: 16666)
-        Long tiggleAmount,      // 티끌 = myAmount - originalAmount (예: 334)
-        Boolean payMoreDefault, // 자동 기부 기본값
-        Boolean creator         // 내가 생성자인지 여부
+        Long tiggleAmount
 ) {}
