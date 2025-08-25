@@ -1,5 +1,6 @@
 package com.example.tiggle.exception;
 
+import com.example.tiggle.exception.account.AccountException;
 import com.example.tiggle.exception.auth.AuthException;
 import com.example.tiggle.exception.auth.MailSendException;
 import org.slf4j.Logger;
@@ -32,6 +33,27 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMailSendException(MailSendException e) {
         ErrorResponse response = new ErrorResponse(false, e.getMessage());
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * 계좌 관련 예외 처리
+     */
+    @ExceptionHandler(AccountException.class)
+    public ResponseEntity<ErrorResponse> handleAccountException(AccountException e) {
+
+        logger.error("계좌 관련 오류: {} (코드: {})", e.getMessage(), e.getErrorCode(), e);
+
+        HttpStatus status = switch (e.getErrorCode()) {
+            case "INVALID_ACCOUNT_NO", "ACCOUNT_NOT_FOUND", "INVALID_AUTH_CODE", 
+                    "VERIFICATION_FAILED", "INVALID_VERIFICATION_TOKEN" -> HttpStatus.BAD_REQUEST;
+            case "PRIMARY_ACCOUNT_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            case "EXTERNAL_API_FAILURE", "BANK_API_ERROR" -> HttpStatus.BAD_GATEWAY;
+            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
+
+        ErrorResponse response = new ErrorResponse(false, e.getMessage());
+
+        return new ResponseEntity<>(response, status);
     }
 
     /**

@@ -8,6 +8,7 @@ import com.example.tiggle.dto.account.response.TransactionDto;
 import com.example.tiggle.dto.account.response.TransactionHistoryResponse;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.entity.Users;
+import com.example.tiggle.exception.account.AccountException;
 import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.account.AccountService;
 import com.example.tiggle.service.account.AccountVerificationTokenService;
@@ -41,20 +42,21 @@ public class AccountServiceImpl implements AccountService {
         String userKey = encryptionService.decrypt(encryptedUserKey);
         
         return financialApiService.openAccountAuth(userKey, accountNo, "티끌")
-                .map(response -> {
+                .flatMap(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
                         getAuthCodeAndSendNotification(encryptedUserKey, accountNo, userId);
-                        return OneWonVerificationResponse.success();
+                        return Mono.just(OneWonVerificationResponse.success());
                     } else {
                         String errorMessage = response.getHeader() != null 
                                 ? response.getHeader().getResponseMessage() 
                                 : "알 수 없는 오류가 발생했습니다.";
-                        return OneWonVerificationResponse.failure(errorMessage);
+                        return Mono.error(AccountException.verificationFailed(errorMessage));
                     }
                 })
+                .onErrorResume(AccountException.class, Mono::error)
                 .onErrorResume(throwable -> {
                     log.error("1원 송금 API 호출 중 오류 발생", throwable);
-                    return Mono.just(OneWonVerificationResponse.failure("계좌 인증 중 오류가 발생했습니다."));
+                    return Mono.error(AccountException.bankApiError("계좌 인증 중 오류가 발생했습니다."));
                 });
     }
     
@@ -62,22 +64,23 @@ public class AccountServiceImpl implements AccountService {
     public Mono<OneWonVerificationValidateResponse> validateOneWonAuth(String encryptedUserKey, String accountNo, String authCode, Long userId) {
         String userKey = encryptionService.decrypt(encryptedUserKey);
         return financialApiService.checkAuthCode(userKey, accountNo, "티끌", authCode)
-                .map(response -> {
+                .flatMap(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
                         Users users = studentRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                                .orElseThrow(AccountException::userNotFound);
                         String verificationToken = tokenService.generateVerificationToken(accountNo, users);
-                        return OneWonVerificationValidateResponse.success(verificationToken);
+                        return Mono.just(OneWonVerificationValidateResponse.success(verificationToken));
                     } else {
                         String errorMessage = response.getHeader() != null 
                                 ? response.getHeader().getResponseMessage() 
-                                : "알 수 없는 오류가 발생했습니다.";
-                        return OneWonVerificationValidateResponse.failure(errorMessage);
+                                : "인증 코드가 올바르지 않습니다.";
+                        return Mono.error(AccountException.verificationFailed(errorMessage));
                     }
                 })
+                .onErrorResume(AccountException.class, Mono::error)
                 .onErrorResume(throwable -> {
                     log.error("1원 송금 인증 코드 검증 API 호출 중 오류 발생", throwable);
-                    return Mono.just(OneWonVerificationValidateResponse.failure("인증 코드 검증 중 오류가 발생했습니다."));
+                    return Mono.error(AccountException.bankApiError("인증 코드 검증 중 오류가 발생했습니다."));
                 });
     }
     
@@ -85,11 +88,11 @@ public class AccountServiceImpl implements AccountService {
     public Mono<ApiResponse<Void>> registerPrimaryAccount(String accountNo, String verificationToken, Long userId) {
         return Mono.fromCallable(() -> {
             if (!tokenService.validateTokenForAccount(verificationToken, accountNo)) {
-                return ApiResponse.<Void>failure("유효하지 않은 검증 토큰이거나 계좌번호가 일치하지 않습니다.");
+                throw AccountException.invalidVerificationToken();
             }
             
             Users user = studentRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                    .orElseThrow(AccountException::userNotFound);
             
             user.setPrimaryAccountNo(accountNo);
             studentRepository.save(user);
@@ -105,10 +108,10 @@ public class AccountServiceImpl implements AccountService {
     public Mono<ApiResponse<PrimaryAccountInfoDto>> getPrimaryAccount(String encryptedUserKey, Long userId) {
         return Mono.fromCallable(() -> {
             Users user = studentRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                    .orElseThrow(AccountException::userNotFound);
             
             if (user.getPrimaryAccountNo() == null) {
-                throw new RuntimeException("등록된 주 계좌가 없습니다.");
+                throw AccountException.primaryAccountNotFound();
             }
             
             return user.getPrimaryAccountNo();
@@ -116,28 +119,26 @@ public class AccountServiceImpl implements AccountService {
         .flatMap(accountNo -> {
             String userKey = encryptionService.decrypt(encryptedUserKey);
             return financialApiService.inquireDemandDepositAccount(userKey, accountNo)
-                .map(response -> {
+                .flatMap(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
                         PrimaryAccountInfoDto accountInfo = new PrimaryAccountInfoDto(
                                 response.getRec().getAccountName(),
                                 response.getRec().getAccountNo(),
                                 response.getRec().getAccountBalance()
                         );
-                        return ApiResponse.success(accountInfo);
+                        return Mono.just(ApiResponse.success(accountInfo));
                     } else {
                         String errorMessage = response.getHeader() != null 
                                 ? response.getHeader().getResponseMessage() 
                                 : "계좌 조회 중 오류가 발생했습니다.";
-                        return ApiResponse.<PrimaryAccountInfoDto>failure(errorMessage);
+                        return Mono.error(AccountException.bankApiError(errorMessage));
                     }
                 });
         })
+        .onErrorResume(AccountException.class, Mono::error)
         .onErrorResume(throwable -> {
             log.error("주 계좌 조회 중 오류 발생", throwable);
-            String errorMessage = "등록된 주 계좌가 없습니다.".equals(throwable.getMessage()) 
-                    ? throwable.getMessage() 
-                    : "계좌 조회 중 오류가 발생했습니다.";
-            return Mono.just(ApiResponse.failure(errorMessage));
+            return Mono.error(AccountException.bankApiError("계좌 조회 중 오류가 발생했습니다."));
         });
     }
     
@@ -146,24 +147,25 @@ public class AccountServiceImpl implements AccountService {
         String userKey = encryptionService.decrypt(encryptedUserKey);
         
         return financialApiService.inquireDemandDepositAccountHolderName(userKey, accountNo)
-                .map(response -> {
+                .flatMap(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
                         AccountHolderInfoDto holderInfo = new AccountHolderInfoDto(
                                 response.getRec().getBankName(),
                                 response.getRec().getAccountNo(),
                                 response.getRec().getUserName()
                         );
-                        return ApiResponse.success(holderInfo);
+                        return Mono.just(ApiResponse.success(holderInfo));
                     } else {
                         String errorMessage = response.getHeader() != null 
                                 ? response.getHeader().getResponseMessage() 
-                                : "예금주 조회 중 오류가 발생했습니다.";
-                        return ApiResponse.<AccountHolderInfoDto>failure(errorMessage);
+                                : "예금주를 찾을 수 없습니다.";
+                        return Mono.error(AccountException.accountNotFound());
                     }
                 })
+                .onErrorResume(AccountException.class, Mono::error)
                 .onErrorResume(throwable -> {
                     log.error("예금주 조회 중 오류 발생", throwable);
-                    return Mono.just(ApiResponse.failure("예금주 조회 중 오류가 발생했습니다."));
+                    return Mono.error(AccountException.bankApiError("예금주 조회 중 오류가 발생했습니다."));
                 });
     }
     
@@ -180,7 +182,7 @@ public class AccountServiceImpl implements AccountService {
         
         return financialApiService.inquireTransactionHistoryList(
                 userKey, accountNo, startDateStr, endDateStr, "A", sort)
-                .map(response -> {
+                .flatMap(response -> {
                     if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
                         List<TransactionDto> allTransactions = response.getRec().getList().stream()
                                 .map(this::convertToTransactionDto)
@@ -204,17 +206,18 @@ public class AccountServiceImpl implements AccountService {
                         TransactionHistoryResponse historyResponse = new TransactionHistoryResponse(
                                 filteredTransactions, nextCursor, hasNext, filteredTransactions.size());
                         
-                        return ApiResponse.success(historyResponse);
+                        return Mono.just(ApiResponse.success(historyResponse));
                     } else {
                         String errorMessage = response.getHeader() != null 
                                 ? response.getHeader().getResponseMessage() 
                                 : "거래 내역 조회 중 오류가 발생했습니다.";
-                        return ApiResponse.<TransactionHistoryResponse>failure(errorMessage);
+                        return Mono.error(AccountException.accountNotFound());
                     }
                 })
+                .onErrorResume(AccountException.class, Mono::error)
                 .onErrorResume(throwable -> {
                     log.error("거래 내역 조회 중 오류 발생", throwable);
-                    return Mono.just(ApiResponse.failure("거래 내역 조회 중 오류가 발생했습니다."));
+                    return Mono.error(AccountException.bankApiError("거래 내역 조회 중 오류가 발생했습니다."));
                 });
     }
     
