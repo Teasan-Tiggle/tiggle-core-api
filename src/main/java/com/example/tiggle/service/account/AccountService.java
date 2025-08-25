@@ -21,4 +21,8 @@ public interface AccountService {
     Mono<ApiResponse<AccountHolderInfoDto>> getAccountHolder(String encryptedUserKey, String accountNo);
     
     Mono<ApiResponse<TransactionHistoryResponse>> getTransactionHistory(String encryptedUserKey, String accountNo, String cursor, Integer size, String sort);
+
+    Mono<Void> transferTiggleToPiggy(String encryptedUserKey, Long userId, Long dutchpayId, long tiggleAmount);
+
+    Mono<Void> transferTiggleIfPayMore(String encryptedUserKey, Long userId, Long dutchpayId, long originalAmount, boolean payMoreSelected);
 }
