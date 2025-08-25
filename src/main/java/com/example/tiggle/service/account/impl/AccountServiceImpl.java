@@ -53,8 +53,10 @@ public class AccountServiceImpl implements AccountService {
                         return Mono.error(AccountException.verificationFailed(errorMessage));
                     }
                 })
-                .onErrorResume(AccountException.class, Mono::error)
                 .onErrorResume(throwable -> {
+                    if (throwable instanceof AccountException) {
+                        return Mono.error(throwable);
+                    }
                     log.error("1원 송금 API 호출 중 오류 발생", throwable);
                     return Mono.error(AccountException.bankApiError("계좌 인증 중 오류가 발생했습니다."));
                 });
@@ -77,8 +79,10 @@ public class AccountServiceImpl implements AccountService {
                         return Mono.error(AccountException.verificationFailed(errorMessage));
                     }
                 })
-                .onErrorResume(AccountException.class, Mono::error)
                 .onErrorResume(throwable -> {
+                    if (throwable instanceof AccountException) {
+                        return Mono.error(throwable);
+                    }
                     log.error("1원 송금 인증 코드 검증 API 호출 중 오류 발생", throwable);
                     return Mono.error(AccountException.bankApiError("인증 코드 검증 중 오류가 발생했습니다."));
                 });
@@ -135,8 +139,10 @@ public class AccountServiceImpl implements AccountService {
                     }
                 });
         })
-        .onErrorResume(AccountException.class, Mono::error)
         .onErrorResume(throwable -> {
+            if (throwable instanceof AccountException) {
+                return Mono.error(throwable);
+            }
             log.error("주 계좌 조회 중 오류 발생", throwable);
             return Mono.error(AccountException.bankApiError("계좌 조회 중 오류가 발생했습니다."));
         });
@@ -162,8 +168,10 @@ public class AccountServiceImpl implements AccountService {
                         return Mono.error(AccountException.accountNotFound());
                     }
                 })
-                .onErrorResume(AccountException.class, Mono::error)
                 .onErrorResume(throwable -> {
+                    if (throwable instanceof AccountException) {
+                        return Mono.error(throwable);
+                    }
                     log.error("예금주 조회 중 오류 발생", throwable);
                     return Mono.error(AccountException.bankApiError("예금주 조회 중 오류가 발생했습니다."));
                 });
@@ -214,8 +222,10 @@ public class AccountServiceImpl implements AccountService {
                         return Mono.error(AccountException.accountNotFound());
                     }
                 })
-                .onErrorResume(AccountException.class, Mono::error)
                 .onErrorResume(throwable -> {
+                    if (throwable instanceof AccountException) {
+                        return Mono.error(throwable);
+                    }
                     log.error("거래 내역 조회 중 오류 발생", throwable);
                     return Mono.error(AccountException.bankApiError("거래 내역 조회 중 오류가 발생했습니다."));
                 });
