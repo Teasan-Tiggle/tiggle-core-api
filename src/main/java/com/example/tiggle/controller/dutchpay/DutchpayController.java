@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/dutchpay")
+@RequestMapping("/api/dutchpay/requests")
 @RequiredArgsConstructor
 @Tag(name = "더치페이 요청")
 @SecurityRequirement(name = "bearerAuth")
@@ -30,7 +30,7 @@ public class DutchpayController {
     private final DutchpayReadService dutchpayReadService;
     private final EncryptionService encryptionService;
 
-    @PostMapping("/requests")
+    @PostMapping
     @Operation(summary = "더치페이 요청 생성(저장 + FCM 발송)")
     public ResponseEntity<ResponseDto<Void>> create(
             @Parameter(name = "Authorization", in = ParameterIn.HEADER,
@@ -50,7 +50,7 @@ public class DutchpayController {
         return ResponseEntity.ok(new ResponseDto<>(true));
     }
 
-    @GetMapping("/{id}/detail")
+    @GetMapping("/{id}")
     @Operation(summary = "더치페이 요청 상세 페이지 조회")
     public ResponseEntity<ResponseDto<DutchpayDetailData>> getDetail(
             @Parameter(name = "Authorization", in = ParameterIn.HEADER,
