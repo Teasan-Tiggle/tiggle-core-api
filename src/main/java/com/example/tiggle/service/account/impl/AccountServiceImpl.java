@@ -8,17 +8,23 @@ import com.example.tiggle.dto.account.response.TransactionDto;
 import com.example.tiggle.dto.account.response.TransactionHistoryResponse;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.entity.Users;
+import com.example.tiggle.repository.piggybank.PiggyBankRepository;
 import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.account.AccountService;
 import com.example.tiggle.service.account.AccountVerificationTokenService;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
 import com.example.tiggle.service.notification.FcmService;
+import com.example.tiggle.service.piggybank.PiggyBankWriterService;
 import com.example.tiggle.service.security.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import java.time.Duration;
 
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -35,6 +41,10 @@ public class AccountServiceImpl implements AccountService {
     private final StudentRepository studentRepository;
     private final EncryptionService encryptionService;
     private final FcmService fcmService;
+    private final PiggyBankRepository piggyBankRepository;
+    private final PiggyBankWriterService piggyBankWriterService;
+
+    private static record LinkedAccounts(String userKey, String primaryAccountNo, String piggyAccountNo) {}
     
     @Override
     public Mono<OneWonVerificationResponse> sendOneWonVerification(String encryptedUserKey, String accountNo, Long userId) {
@@ -312,5 +322,87 @@ public class AccountServiceImpl implements AccountService {
             log.error("거래 내역 조회 중 오류 발생", e);
             return null;
         }
+    }
+
+    @Override
+    public Mono<Void> transferTiggleIfPayMore(String encryptedUserKey, Long userId, Long dutchpayId, long originalAmount, boolean payMoreSelected) {
+        if (!payMoreSelected) return Mono.empty();
+        long tiggle = calcTiggle(originalAmount);
+        if (tiggle <= 0) return Mono.empty();
+        return transferTiggleToPiggy(encryptedUserKey, userId, dutchpayId, tiggle);
+    }
+
+    @Override
+    public Mono<Void> transferTiggleToPiggy(String encryptedUserKey, Long userId, Long dutchpayId, long tiggleAmount) {
+        if (tiggleAmount <= 0) return Mono.empty();
+
+        return Mono.fromCallable(() -> {
+                    String userKey = encryptionService.decrypt(encryptedUserKey);
+                    return getLinkedAccounts(userKey, userId);
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(link ->
+                        financialApiService.updateDemandDepositAccountTransfer(
+                                        link.userKey(),                         // userKey (복호화)
+                                        link.piggyAccountNo(),                  // 입금: 저금통
+                                        "티끌 저금 입금(#" + dutchpayId + ")",
+                                        String.valueOf(tiggleAmount),
+                                        link.primaryAccountNo(),                // 출금: 대표계좌
+                                        "티끌 저금 출금(#" + dutchpayId + ")"
+                                )
+                                .timeout(Duration.ofSeconds(5))
+                                .map(resp -> {
+                                    boolean ok = resp.getHeader() != null && "H0000".equals(resp.getHeader().getResponseCode());
+                                    if (!ok) {
+                                        String msg = resp.getHeader() == null ? "응답 헤더 없음" : resp.getHeader().getResponseMessage();
+                                        throw new IllegalStateException("이체 실패: " + msg);
+                                    }
+                                    return resp;
+                                })
+                )
+                .flatMap(resp ->
+                        Mono.fromRunnable(() ->
+                                piggyBankWriterService.applyTiggle(
+                                        userId, BigDecimal.valueOf(tiggleAmount).setScale(2)
+                                )
+                        ).subscribeOn(Schedulers.boundedElastic())
+                )
+                .then()
+                .onErrorResume(org.springframework.web.reactive.function.client.WebClientResponseException.class, e -> {
+                    log.warn("티끌 자동저금 실패 userId={}, dutchpayId={}, status={}, headers={}, body={}",
+                            userId, dutchpayId, e.getStatusCode(), e.getHeaders(), e.getResponseBodyAsString(), e);
+                    return Mono.empty();
+                })
+                .onErrorResume(e -> {
+                    log.warn("티끌 자동저금 실패(일반) userId={}, dutchpayId={}, msg={}", userId, dutchpayId, e.getMessage(), e);
+                    return Mono.empty();
+                });
+    }
+
+    /** userKey는 JWT에서, 계좌정보는 DB에서 */
+    private LinkedAccounts getLinkedAccounts(String userKey, Long userId) {
+        var piggy = piggyBankRepository.findByOwner_Id(userId)
+                .orElseThrow(() -> new IllegalStateException("Piggy bank not found for user: " + userId));
+
+        var user = studentRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + userId));
+
+        String primary = user.getPrimaryAccountNo();
+        String piggyAcc = piggy.getAccountNo();
+
+        if (userKey == null || userKey.isBlank())
+            throw new IllegalStateException("userKey not linked for user: " + userId);
+        if (primary == null || primary.isBlank())
+            throw new IllegalStateException("primaryAccountNo not linked for user: " + userId);
+        if (piggyAcc == null || piggyAcc.isBlank())
+            throw new IllegalStateException("piggy account_no not linked for user: " + userId);
+
+        return new LinkedAccounts(userKey, primary, piggyAcc);
+    }
+
+    private long calcTiggle(long original) {
+        if (original <= 0) return 0L;
+        long rounded = ((original + 99L) / 100L) * 100L;
+        return Math.max(0L, rounded - original);
     }
 }
