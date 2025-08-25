@@ -2,6 +2,7 @@ package com.example.tiggle.service.donation;
 
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
+import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
 import com.example.tiggle.entity.DonationHistory;
 import com.example.tiggle.entity.EsgCategory;
 import com.example.tiggle.entity.Users;
@@ -24,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -139,5 +141,20 @@ public class DonationServiceImpl implements DonationService {
                                     }).subscribeOn(Schedulers.boundedElastic())
                             );
                 }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @Override
+    public ApiResponse<List<DonationHistoryResponse>> getDonationHistory(Long userId) {
+        List<DonationHistoryResponse> histories = donationHistoryRepository.findByUser_IdOrderByDonatedAtDesc(userId)
+                .stream()
+                .map(donation -> DonationHistoryResponse.builder()
+                        .category(donation.getEsgCategory().getName())
+                        .amount(donation.getAmount().longValue())
+                        .donatedAt(donation.getDonatedAt())
+                        .title(donation.getTitle())
+                        .build())
+                .toList();
+
+        return ApiResponse.success(histories);
     }
 }

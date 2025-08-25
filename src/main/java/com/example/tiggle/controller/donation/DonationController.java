@@ -2,6 +2,7 @@ package com.example.tiggle.controller.donation;
 
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
+import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
 import com.example.tiggle.service.donation.DonationService;
 import com.example.tiggle.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,10 +12,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -45,6 +45,29 @@ public class DonationController {
         Long userId = JwtUtil.getCurrentUserId();
         String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
         ApiResponse<Object> response = donationService.createDonation(userId, encryptedUserKey, request).block();
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 기부 기록 조회
+     *
+     * @return 기부 내역 목록
+     */
+    @GetMapping("/history")
+    @Operation(summary = "나의 기부 기록", description = "나의 기부 내역을 조회합니다.")
+    @ApiResponses(value = {
+//            @ApiResponse(responseCode = "200", description = "조회 성공"),
+//            @ApiResponse(responseCode = "400", description = "유효하지 않은 입력값"),
+//            @ApiResponse(responseCode = "401", description = "인증 실패"),
+//            @ApiResponse(responseCode = "500", description = "서버 에러")
+    })
+    public ResponseEntity<ApiResponse<List<DonationHistoryResponse>>> getDonationHistory(
+//            @RequestParam(required = false) String cursor,
+//            @RequestParam(defaultValue = "20") Integer size,
+//            @RequestParam(defaultValue = "DESC") String sort
+    ) {
+        Long userId = JwtUtil.getCurrentUserId();
+        ApiResponse<List<DonationHistoryResponse>> response = donationService.getDonationHistory(userId);
         return ResponseEntity.ok(response);
     }
 }
