@@ -1,4 +1,4 @@
-package com.example.tiggle.service;
+package com.example.tiggle.service.sms;
 
 import java.security.MessageDigest;
 import java.security.SecureRandom;
