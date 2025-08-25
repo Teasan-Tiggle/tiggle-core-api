@@ -379,7 +379,6 @@ public class AccountServiceImpl implements AccountService {
                 });
     }
 
-    /** userKey는 JWT에서, 계좌정보는 DB에서 */
     private LinkedAccounts getLinkedAccounts(String userKey, Long userId) {
         var piggy = piggyBankRepository.findByOwner_Id(userId)
                 .orElseThrow(() -> new IllegalStateException("Piggy bank not found for user: " + userId));
