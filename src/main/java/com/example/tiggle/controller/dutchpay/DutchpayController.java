@@ -2,6 +2,8 @@ package com.example.tiggle.controller.dutchpay;
 
 import com.example.tiggle.dto.ResponseDto;
 import com.example.tiggle.dto.dutchpay.request.CreateDutchpayRequest;
+import com.example.tiggle.dto.dutchpay.request.DutchpayDetailData;
+import com.example.tiggle.service.dutchpay.DutchpayReadService;
 import com.example.tiggle.service.dutchpay.DutchpayService;
 import com.example.tiggle.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class DutchpayController {
 
     private final DutchpayService dutchpayService;
+    private final DutchpayReadService dutchpayReadService;
 
     @PostMapping("/requests")
     @Operation(summary = "더치페이 요청 생성(저장 + FCM 발송)")
@@ -41,4 +44,12 @@ public class DutchpayController {
         dutchpayService.create(creatorId, req);
         return ResponseEntity.ok(new ResponseDto<>(true));
     }
+
+    @GetMapping("/{id}/detail")
+    @Operation(summary = "더치페이 요청 상세 페이지 조회")
+    public ResponseEntity<ResponseDto<DutchpayDetailData>> getDetail(@PathVariable("id") Long dutchpayId) {
+        Long userId = JwtUtil.getCurrentUserId();
+        return ResponseEntity.ok(dutchpayReadService.getDetail(dutchpayId, userId));
+    }
+
 }
