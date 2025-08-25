@@ -168,15 +168,15 @@ public class DonationServiceImpl implements DonationService {
     @Override
     public DonationStatus getUserDonationStatus(Long userId) {
         // 1. Map 초기화: 0값 보장
-        Map<String, BigDecimal> map = new HashMap<>(Map.of(
-                "Planet", BigDecimal.ZERO,
-                "People", BigDecimal.ZERO,
-                "Prosperity", BigDecimal.ZERO
+        Map<String, Long> map = new HashMap<>(Map.of(
+                "Planet", 0L,
+                "People", 0L,
+                "Prosperity", 0L
         ));
 
         // 2. DB에서 Projection 결과를 가져와 덮어쓰기
         donationHistoryRepository.findTotalAmountByCategoryAndUser(userId)
-                .forEach(d -> map.put(d.getCategory(), d.getTotal()));
+                .forEach(d -> map.put(d.getCategory(), d.getTotal().longValue()));
 
         // 3. DTO(record) 반환
         return new DonationStatus(
@@ -197,15 +197,15 @@ public class DonationServiceImpl implements DonationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자 소속 학교 정보가 없습니다."));
 
         // 1. Map 초기화: 0값 보장
-        Map<String, BigDecimal> map = new HashMap<>(Map.of(
-                "Planet", BigDecimal.ZERO,
-                "People", BigDecimal.ZERO,
-                "Prosperity", BigDecimal.ZERO
+        Map<String, Long> map = new HashMap<>(Map.of(
+                "Planet", 0L,
+                "People", 0L,
+                "Prosperity", 0L
         ));
 
         // 2. DB에서 Projection 결과를 가져와 덮어쓰기
         donationHistoryRepository.findTotalAmountByCategoryAndUniversity(universityId)
-                .forEach(d -> map.put(d.getCategory(), d.getTotal()));
+                .forEach(d -> map.put(d.getCategory(), d.getTotal().longValue()));
 
         // 3. DTO(record) 반환
         return new DonationStatus(
@@ -218,15 +218,15 @@ public class DonationServiceImpl implements DonationService {
     @Override
     public DonationStatus getTotalDonationStatus() {
         // 1. Map 초기화: 0값 보장
-        Map<String, BigDecimal> map = new HashMap<>(Map.of(
-                "Planet", BigDecimal.ZERO,
-                "People", BigDecimal.ZERO,
-                "Prosperity", BigDecimal.ZERO
+        Map<String, Long> map = new HashMap<>(Map.of(
+                "Planet", 0L,
+                "People", 0L,
+                "Prosperity", 0L
         ));
 
         // 2. DB에서 Projection 결과를 가져와 덮어쓰기
         donationHistoryRepository.findTotalAmountByCategory()
-                .forEach(d -> map.put(d.getCategory(), d.getTotal()));
+                .forEach(d -> map.put(d.getCategory(), d.getTotal().longValue()));
 
         // 3. DTO(record) 반환
         return new DonationStatus(
