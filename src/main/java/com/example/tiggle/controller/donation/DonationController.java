@@ -3,6 +3,7 @@ package com.example.tiggle.controller.donation;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
 import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
+import com.example.tiggle.dto.donation.response.DonationStatus;
 import com.example.tiggle.service.donation.DonationService;
 import com.example.tiggle.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -65,5 +66,52 @@ public class DonationController {
         Long userId = JwtUtil.getCurrentUserId();
         ApiResponse<List<DonationHistoryResponse>> response = donationService.getDonationHistory(userId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 나의 기부 현황 조회
+     *
+     * @return 기부 현황
+     */
+    @GetMapping("/status")
+    @Operation(summary = "나의 기부 현황 조회", description = "나의 기부 현황을 조회합니다.")
+    @ApiResponses(value = {
+//            @ApiResponse(responseCode = "200", description = "조회 성공"),
+//            @ApiResponse(responseCode = "401", description = "인증 실패"),
+//            @ApiResponse(responseCode = "500", description = "서버 에러")
+    })
+    public ResponseEntity<ApiResponse<DonationStatus>> getMyStatus() {
+        Long userId = JwtUtil.getCurrentUserId();
+        DonationStatus response = donationService.getUserDonationStatus(userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 우리 학교 기부 현황 조회
+     *
+     * @return 기부 현황
+     */
+    @GetMapping("/status/university")
+    @Operation(summary = "우리 학교 기부 현황 조회", description = "우리 학교의 기부 현황을 조회합니다.")
+    @ApiResponses(value = {
+    })
+    public ResponseEntity<ApiResponse<DonationStatus>> getUniversityStatus() {
+        Long userId = JwtUtil.getCurrentUserId();
+        DonationStatus response = donationService.getUniversityDonationStatus(userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 전체 학교 기부 현황 조회
+     *
+     * @return 기부 현황
+     */
+    @GetMapping("/status/university/all")
+    @Operation(summary = "전체 학교 기부 현황 조회", description = "전체 학교의 기부 현황을 조회합니다.")
+    @ApiResponses(value = {
+    })
+    public ResponseEntity<ApiResponse<DonationStatus>> getTotalStatus() {
+        DonationStatus response = donationService.getTotalDonationStatus();
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

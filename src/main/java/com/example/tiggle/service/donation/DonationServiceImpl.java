@@ -3,8 +3,10 @@ package com.example.tiggle.service.donation;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
 import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
+import com.example.tiggle.dto.donation.response.DonationStatus;
 import com.example.tiggle.entity.DonationHistory;
 import com.example.tiggle.entity.EsgCategory;
+import com.example.tiggle.entity.University;
 import com.example.tiggle.entity.Users;
 import com.example.tiggle.exception.DonationException;
 import com.example.tiggle.exception.GlobalExceptionHandler;
@@ -16,8 +18,10 @@ import com.example.tiggle.service.security.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -25,7 +29,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -156,5 +163,76 @@ public class DonationServiceImpl implements DonationService {
                 .toList();
 
         return ApiResponse.success(histories);
+    }
+
+    @Override
+    public DonationStatus getUserDonationStatus(Long userId) {
+        // 1. Map 초기화: 0값 보장
+        Map<String, BigDecimal> map = new HashMap<>(Map.of(
+                "Planet", BigDecimal.ZERO,
+                "People", BigDecimal.ZERO,
+                "Prosperity", BigDecimal.ZERO
+        ));
+
+        // 2. DB에서 Projection 결과를 가져와 덮어쓰기
+        donationHistoryRepository.findTotalAmountByCategoryAndUser(userId)
+                .forEach(d -> map.put(d.getCategory(), d.getTotal()));
+
+        // 3. DTO(record) 반환
+        return new DonationStatus(
+                map.get("Planet"),
+                map.get("People"),
+                map.get("Prosperity")
+        );
+    }
+
+    @Override
+    public DonationStatus getUniversityDonationStatus(Long userId) {
+
+        Users user = studentRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+        Long universityId = Optional.ofNullable(user.getUniversity())
+                .map(University::getId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자 소속 학교 정보가 없습니다."));
+
+        // 1. Map 초기화: 0값 보장
+        Map<String, BigDecimal> map = new HashMap<>(Map.of(
+                "Planet", BigDecimal.ZERO,
+                "People", BigDecimal.ZERO,
+                "Prosperity", BigDecimal.ZERO
+        ));
+
+        // 2. DB에서 Projection 결과를 가져와 덮어쓰기
+        donationHistoryRepository.findTotalAmountByCategoryAndUniversity(universityId)
+                .forEach(d -> map.put(d.getCategory(), d.getTotal()));
+
+        // 3. DTO(record) 반환
+        return new DonationStatus(
+                map.get("Planet"),
+                map.get("People"),
+                map.get("Prosperity")
+        );
+    }
+
+    @Override
+    public DonationStatus getTotalDonationStatus() {
+        // 1. Map 초기화: 0값 보장
+        Map<String, BigDecimal> map = new HashMap<>(Map.of(
+                "Planet", BigDecimal.ZERO,
+                "People", BigDecimal.ZERO,
+                "Prosperity", BigDecimal.ZERO
+        ));
+
+        // 2. DB에서 Projection 결과를 가져와 덮어쓰기
+        donationHistoryRepository.findTotalAmountByCategory()
+                .forEach(d -> map.put(d.getCategory(), d.getTotal()));
+
+        // 3. DTO(record) 반환
+        return new DonationStatus(
+                map.get("Planet"),
+                map.get("People"),
+                map.get("Prosperity")
+        );
     }
 }
