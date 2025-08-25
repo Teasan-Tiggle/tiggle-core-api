@@ -61,11 +61,7 @@ public class DonationController {
 //            @ApiResponse(responseCode = "401", description = "인증 실패"),
 //            @ApiResponse(responseCode = "500", description = "서버 에러")
     })
-    public ResponseEntity<ApiResponse<List<DonationHistoryResponse>>> getDonationHistory(
-//            @RequestParam(required = false) String cursor,
-//            @RequestParam(defaultValue = "20") Integer size,
-//            @RequestParam(defaultValue = "DESC") String sort
-    ) {
+    public ResponseEntity<ApiResponse<List<DonationHistoryResponse>>> getDonationHistory() {
         Long userId = JwtUtil.getCurrentUserId();
         ApiResponse<List<DonationHistoryResponse>> response = donationService.getDonationHistory(userId);
         return ResponseEntity.ok(response);
