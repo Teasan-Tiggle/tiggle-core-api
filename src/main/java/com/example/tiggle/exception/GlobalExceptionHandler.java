@@ -43,10 +43,12 @@ public class GlobalExceptionHandler {
         logger.error("사용자 인증/인가 오류: {} (코드: {})", e.getMessage(), e.getErrorCode(), e);
 
         HttpStatus status = switch (e.getErrorCode()) {
-            case "USER_NOT_FOUND", "PASSWORD_MISMATCH" -> HttpStatus.UNAUTHORIZED;
+            case "USER_NOT_FOUND", "PASSWORD_MISMATCH", "JWT_EXPIRED", "JWT_UNSUPPORTED",
+                    "JWT_MALFORMED", "JWT_SIGNATURE_INVALID", "JWT_ILLEGAL_ARGUMENT", "INVALID_TOKEN",
+                    "REFRESH_TOKEN_NOT_FOUND", "REFRESH_TOKEN_MISMATCH", "USER_KEY_NOT_FOUND" -> HttpStatus.UNAUTHORIZED;
             case "DUPLICATE_EMAIL", "DUPLICATE_STUDENT_ID" -> HttpStatus.CONFLICT;
             case "UNIVERSITY_NOT_FOUND", "DEPARTMENT_NOT_FOUND" -> HttpStatus.BAD_REQUEST;
-            case "EXTERNAL_API_FAILURE", "EXTERNAL_API_USER_CREATION_FAILURE", "EXTERNAL_API_USER_NOT_FOUND" -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case "EXTERNAL_API_FAILURE", "EXTERNAL_API_USER_CREATION_FAILURE", "EXTERNAL_API_USER_NOT_FOUND" -> HttpStatus.BAD_GATEWAY;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
 
