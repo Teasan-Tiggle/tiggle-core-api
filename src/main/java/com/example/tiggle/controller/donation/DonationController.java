@@ -177,4 +177,19 @@ public class DonationController {
         List<DonationRanking> response = donationService.getUniversityRanking();
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+
+    /**
+     * 학과 기부 랭킹 조회
+     *
+     * @return 학교 랭킹 목록
+     */
+    @GetMapping("/rank/department")
+    @Operation(summary = "학과 기부 랭킹 조회", description = "학과 기부 랭킹을 조회합니다.")
+    @ApiResponses(value = {
+    })
+    public ResponseEntity<ApiResponse<List<DonationRanking>>> getDepartmentRanking() {
+        Long userId = JwtUtil.getCurrentUserId();
+        List<DonationRanking> response = donationService.getDepartmentRanking(userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }

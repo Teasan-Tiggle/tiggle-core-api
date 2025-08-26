@@ -322,4 +322,25 @@ public class DonationServiceImpl implements DonationService {
                 ))
                 .toList();
     }
+
+    @Override
+    public List<DonationRanking> getDepartmentRanking(Long userId) {
+
+        Users user = studentRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+        Long universityId = Optional.ofNullable(user.getUniversity())
+                .map(University::getId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자 소속 학교 정보가 없습니다."));
+
+        List<RankingProjection> list = donationHistoryRepository.getDepartmentRanking(universityId);
+
+        return list.stream()
+                .map(dto -> new DonationRanking(
+                        dto.getRank(),
+                        dto.getName(),
+                        dto.getAmount()
+                ))
+                .toList();
+    }
 }

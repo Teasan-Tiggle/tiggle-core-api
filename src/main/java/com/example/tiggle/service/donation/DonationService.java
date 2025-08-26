@@ -27,4 +27,6 @@ public interface DonationService {
     DonationSummary getUserDonationSummary(Long userId);
 
     List<DonationRanking> getUniversityRanking();
+
+    List<DonationRanking> getDepartmentRanking(Long userId);
 }
