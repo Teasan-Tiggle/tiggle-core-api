@@ -15,6 +15,12 @@ public class WebClientConfig {
     @Value("${external-api.ssafy.base-url}")
     private String ssafyBaseUrl;
 
+    @Value("${external-api.openai.base-url}")
+    private String openAiBaseUrl;
+
+    @Value("${external-api.openai.api-key}")
+    private String openAiApiKey;
+
     @Bean
     public WebClient webClient() {
         HttpClient httpClient = HttpClient.create()
@@ -35,6 +41,20 @@ public class WebClientConfig {
 
         return WebClient.builder()
                 .baseUrl(ssafyBaseUrl)
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(1024 * 1024))
+                .build();
+    }
+
+    @Bean
+    public WebClient generateAiApiWebClient() {
+        HttpClient httpClient = HttpClient.create()
+                .responseTimeout(Duration.ofSeconds(30))
+                .option(io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000);
+
+        return WebClient.builder()
+                .baseUrl(openAiBaseUrl)
+                .defaultHeader("Authorization", "Bearer " + openAiApiKey)
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(1024 * 1024))
                 .build();
