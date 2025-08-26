@@ -1,5 +1,6 @@
 package com.example.tiggle.dto.dutchpay.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 
 import java.time.LocalDateTime;
@@ -12,6 +13,7 @@ public record DutchpayListItemResponse(
         long totalAmount,
         int participantCount,
         int paidCount,
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         LocalDateTime requestedAt,
         boolean isCreator
 ) {}
