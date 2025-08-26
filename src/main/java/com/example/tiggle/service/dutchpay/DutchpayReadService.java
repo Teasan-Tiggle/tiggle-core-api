@@ -2,16 +2,22 @@ package com.example.tiggle.service.dutchpay;
 
 import com.example.tiggle.dto.ResponseDto;
 import com.example.tiggle.dto.dutchpay.request.DutchpayDetailData;
+import com.example.tiggle.dto.dutchpay.response.DutchpaySummaryResponse;
 import com.example.tiggle.repository.dutchpay.DutchpayQueryRepository;
 import com.example.tiggle.repository.dutchpay.projection.DutchpayDetailProjection;
+import com.example.tiggle.repository.dutchpay.projection.DutchpaySummaryProjection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
 public class DutchpayReadService {
 
     private final DutchpayQueryRepository queryRepo;
+    private static final String TRANSFERRED_STATUS = "PAID";
 
     public ResponseDto<DutchpayDetailData> getDetail(Long dutchpayId, Long userId) {
         DutchpayDetailProjection p = queryRepo.findDetail(dutchpayId, userId);
@@ -50,5 +56,19 @@ public class DutchpayReadService {
     private long roundUpTo100(long amount) {
         if (amount <= 0) return 0;
         return ((amount + 99) / 100) * 100;
+    }
+
+    public DutchpaySummaryResponse getSummary(Long userId) {
+        DutchpaySummaryProjection p = queryRepo.summarizeByUserId(userId, TRANSFERRED_STATUS);
+
+        long total = (p == null || p.getTotalTransferredAmount() == null) ? 0L : p.getTotalTransferredAmount();
+        long tcnt  = (p == null || p.getTransferCount() == null)          ? 0L : p.getTransferCount();
+        long pcnt  = (p == null || p.getParticipatedCount() == null)      ? 0L : p.getParticipatedCount();
+
+        return DutchpaySummaryResponse.builder()
+                .totalTransferredAmount(total)
+                .transferCount(tcnt)
+                .participatedCount(pcnt)
+                .build();
     }
 }

@@ -2,6 +2,7 @@ package com.example.tiggle.repository.dutchpay;
 
 import com.example.tiggle.entity.Dutchpay;
 import com.example.tiggle.repository.dutchpay.projection.DutchpayDetailProjection;
+import com.example.tiggle.repository.dutchpay.projection.DutchpaySummaryProjection;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
@@ -29,5 +30,18 @@ public interface DutchpayQueryRepository extends Repository<Dutchpay, Long> {
     DutchpayDetailProjection findDetail(@Param("dutchpayId") Long dutchpayId,
                                         @Param("userId") Long userId);
 
+
+    @Query(value = """
+        SELECT
+          CAST(COALESCE(SUM(IF(ds.status = :transferredStatus, ds.amount, 0)), 0) AS SIGNED) AS totalTransferredAmount,
+          CAST(SUM(IF(ds.status = :transferredStatus, 1, 0)) AS SIGNED)                     AS transferCount,
+          CAST(COUNT(DISTINCT ds.dutchpay_id) AS SIGNED)                                     AS participatedCount
+        FROM dutchpay_share ds
+        WHERE ds.user_id = :userId
+        """, nativeQuery = true)
+    DutchpaySummaryProjection summarizeByUserId(
+            @Param("userId") Long userId,
+            @Param("transferredStatus") String transferredStatus
+    );
 
 }
