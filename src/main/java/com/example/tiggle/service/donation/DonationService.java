@@ -3,10 +3,7 @@ package com.example.tiggle.service.donation;
 import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
-import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
-import com.example.tiggle.dto.donation.response.DonationGrowthLevel;
-import com.example.tiggle.dto.donation.response.DonationStatus;
-import com.example.tiggle.dto.donation.response.DonationSummary;
+import com.example.tiggle.dto.donation.response.*;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -28,4 +25,6 @@ public interface DonationService {
     DonationGrowthLevel getDonationGrowthLevel(Long userId);
 
     DonationSummary getUserDonationSummary(Long userId);
+
+    List<DonationRanking> getUniversityRanking();
 }
