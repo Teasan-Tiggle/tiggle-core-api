@@ -7,7 +7,11 @@ import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
 import com.example.tiggle.dto.account.response.TransactionDto;
 import com.example.tiggle.dto.account.response.TransactionHistoryResponse;
 import com.example.tiggle.dto.common.ApiResponse;
+import com.example.tiggle.entity.Dutchpay;
+import com.example.tiggle.entity.DutchpayShare;
 import com.example.tiggle.entity.Users;
+import com.example.tiggle.repository.dutchpay.DutchpayRepository;
+import com.example.tiggle.repository.dutchpay.DutchpayShareRepository;
 import com.example.tiggle.repository.piggybank.PiggyBankRepository;
 import com.example.tiggle.exception.account.AccountException;
 import com.example.tiggle.repository.user.StudentRepository;
@@ -44,6 +48,8 @@ public class AccountServiceImpl implements AccountService {
     private final FcmService fcmService;
     private final PiggyBankRepository piggyBankRepository;
     private final PiggyBankWriterService piggyBankWriterService;
+    private final DutchpayRepository dutchpayRepo;
+    private final DutchpayShareRepository shareRepo;
 
     private static record LinkedAccounts(String userKey, String primaryAccountNo, String piggyAccountNo) {}
 
@@ -356,9 +362,9 @@ public class AccountServiceImpl implements AccountService {
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(link ->
                         financialApiService.updateDemandDepositAccountTransfer(
-                                        link.userKey(),                         // userKey (복호화)
+                                        link.userKey(),
                                         link.piggyAccountNo(),                  // 입금: 저금통
-                                        "티끌 저금 입금(#" + dutchpayId + ")",
+                                        "[TIGGLE][PM] U" + userId + " DP" + dutchpayId,
                                         String.valueOf(tiggleAmount),
                                         link.primaryAccountNo(),                // 출금: 대표계좌
                                         "티끌 저금 출금(#" + dutchpayId + ")"
@@ -366,6 +372,8 @@ public class AccountServiceImpl implements AccountService {
                                 .timeout(Duration.ofSeconds(5))
                                 .map(resp -> {
                                     boolean ok = resp.getHeader() != null && "H0000".equals(resp.getHeader().getResponseCode());
+                                    log.info("[TIGGLE][PM] transfer result ok={}, userId={}, dpId={}, amount={}",
+                                            ok, userId, dutchpayId, tiggleAmount);
                                     if (!ok) {
                                         String msg = resp.getHeader() == null ? "응답 헤더 없음" : resp.getHeader().getResponseMessage();
                                         throw new IllegalStateException("이체 실패: " + msg);
@@ -374,21 +382,21 @@ public class AccountServiceImpl implements AccountService {
                                 })
                 )
                 .flatMap(resp ->
-                        Mono.fromRunnable(() ->
-                                piggyBankWriterService.applyTiggle(
-                                        userId, BigDecimal.valueOf(tiggleAmount).setScale(2)
-                                )
-                        ).subscribeOn(Schedulers.boundedElastic())
+                        Mono.fromCallable(() -> {
+                            // 원 단위라면 scale(0)도 가능: BigDecimal.valueOf(tiggleAmount)
+                            piggyBankWriterService.applyTiggle(userId, BigDecimal.valueOf(tiggleAmount));
+                            return true;
+                        }).subscribeOn(Schedulers.boundedElastic())
                 )
                 .then()
                 .onErrorResume(org.springframework.web.reactive.function.client.WebClientResponseException.class, e -> {
                     log.warn("티끌 자동저금 실패 userId={}, dutchpayId={}, status={}, headers={}, body={}",
                             userId, dutchpayId, e.getStatusCode(), e.getHeaders(), e.getResponseBodyAsString(), e);
-                    return Mono.empty();
+                    return Mono.error(e); // 테스트 중에는 에러 드러내기
                 })
                 .onErrorResume(e -> {
                     log.warn("티끌 자동저금 실패(일반) userId={}, dutchpayId={}, msg={}", userId, dutchpayId, e.getMessage(), e);
-                    return Mono.empty();
+                    return Mono.error(e); // 테스트 중에는 에러 드러내기
                 });
     }
 
@@ -417,4 +425,121 @@ public class AccountServiceImpl implements AccountService {
         long rounded = ((original + 99L) / 100L) * 100L;
         return Math.max(0L, rounded - original);
     }
+
+    @Override
+    public Mono<Void> payDutchShare(String encryptedUserKey, Long dutchpayId, Long userId, boolean payMore) {
+        return Mono.fromCallable(() -> {
+                    Dutchpay dp = dutchpayRepo.findById(dutchpayId)
+                            .orElseThrow(() -> new IllegalStateException("더치페이 없음"));
+                    DutchpayShare share = shareRepo.findByDutchpayIdAndUserId(dutchpayId, userId)
+                            .orElseThrow(() -> new IllegalStateException("참여 정보 없음"));
+
+                    if ("PAID".equalsIgnoreCase(share.getStatus())) {
+                        log.info("[Dutchpay][pay] already PAID — skip. dpId={}, userId={}", dutchpayId, userId);
+                        return new Object[]{dp, share, null}; // 이후 flatMap에서 Mono.empty()로 처리
+                    }
+
+                    long base = share.getAmount();
+                    long topUp = 0L;
+                    if (payMore) {
+                        Long rpp = dp.getRoundedPerPerson();
+                        if (rpp == null || rpp < base) {
+                            topUp = calcTiggle(base); // 100원 올림 자투리
+                        } else {
+                            topUp = Math.max(0L, rpp - base);
+                        }
+                    }
+                    log.info("[Dutchpay][pay] start. dpId={}, userId={}, base={}, topUp={}, payMore={}",
+                            dutchpayId, userId, base, topUp, payMore);
+
+                    return new Object[]{dp, share, topUp};
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(arr -> {
+                    Dutchpay dp = (Dutchpay) arr[0];
+                    DutchpayShare share = (DutchpayShare) arr[1];
+                    Long topUp = (Long) arr[2];
+
+                    if (topUp == null) return Mono.empty();
+
+                    String userKey = encryptionService.decrypt(encryptedUserKey);
+                    LinkedAccounts payerLink = getLinkedAccounts(userKey, userId);
+
+                    if (dp.getCreator() != null && dp.getCreator().getId().equals(userId)) {
+                        Mono<Void> topup = (topUp > 0)
+                                ? transferTiggleToPiggy(encryptedUserKey, userId, dutchpayId, topUp)
+                                .onErrorResume(e -> {
+                                    log.warn("[PayMore][creator] 실패 userId={}, dpId={}, {}", userId, dutchpayId, e.getMessage());
+                                    return Mono.empty();
+                                })
+                                : Mono.empty();
+
+                        return topup.then(
+                                Mono.fromCallable(() -> {
+                                    share.setStatus("PAID");
+                                    shareRepo.saveAndFlush(share);
+
+                                    long unpaid = shareRepo.countByDutchpayIdAndStatusNot(dutchpayId, "PAID");
+                                    if (unpaid == 0 && !"COMPLETED".equalsIgnoreCase(dp.getStatus())) {
+                                        dp.setStatus("COMPLETED");
+                                        dutchpayRepo.saveAndFlush(dp);
+                                        log.info("[Dutchpay] 모든 참가자 납부 완료 → COMPLETED (dpId={})", dutchpayId);
+                                    }
+                                    return true;
+                                }).subscribeOn(Schedulers.boundedElastic())
+                        ).then();
+                    }
+
+                    Long creatorId = dp.getCreator().getId();
+                    Users creator = studentRepository.findById(creatorId)
+                            .orElseThrow(() -> new IllegalStateException("생성자 사용자 없음"));
+                    String creatorPrimary = creator.getPrimaryAccountNo();
+                    if (creatorPrimary == null || creatorPrimary.isBlank()) {
+                        return Mono.error(new IllegalStateException("생성자 주계좌 미등록"));
+                    }
+
+                    return financialApiService.updateDemandDepositAccountTransfer(
+                                    payerLink.userKey(),
+                                    creatorPrimary, // 입금: 생성자 주계좌
+                                    "[DUTCH][PAY] DP" + dutchpayId + " U" + userId,
+                                    String.valueOf(share.getAmount()),
+                                    payerLink.primaryAccountNo(), // 출금: 참여자 주계좌
+                                    "더치페이 납부 DP" + dutchpayId + " U" + userId
+                            )
+                            .timeout(Duration.ofSeconds(5))
+                            .flatMap(resp -> {
+                                boolean ok = resp.getHeader() != null && "H0000".equals(resp.getHeader().getResponseCode());
+                                if (!ok) {
+                                    String msg = resp.getHeader() == null ? "응답 헤더 없음" : resp.getHeader().getResponseMessage();
+                                    return Mono.error(new IllegalStateException("지분 이체 실패: " + msg));
+                                }
+
+                                Mono<Void> topup = (topUp > 0)
+                                        ? transferTiggleToPiggy(encryptedUserKey, userId, dutchpayId, topUp)
+                                        .onErrorResume(e -> {
+                                            log.warn("[PayMore] 실패 userId={}, dpId={}, {}", userId, dutchpayId, e.getMessage());
+                                            return Mono.empty();
+                                        })
+                                        : Mono.empty();
+
+                                return topup.then(
+                                        Mono.fromCallable(() -> {
+                                            share.setStatus("PAID");
+                                            shareRepo.saveAndFlush(share);
+
+                                            long unpaid = shareRepo.countByDutchpayIdAndStatusNot(dutchpayId, "PAID");
+                                            if (unpaid == 0 && !"COMPLETED".equalsIgnoreCase(dp.getStatus())) {
+                                                dp.setStatus("COMPLETED");
+                                                dutchpayRepo.saveAndFlush(dp);
+                                                log.info("[Dutchpay] 모든 참가자 납부 완료 → COMPLETED (dpId={})", dutchpayId);
+                                            }
+                                            return true;
+                                        }).subscribeOn(Schedulers.boundedElastic())
+                                );
+                            });
+                })
+                .then();
+    }
+
+
 }

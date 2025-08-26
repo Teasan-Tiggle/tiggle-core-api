@@ -3,6 +3,7 @@ package com.example.tiggle.controller.dutchpay;
 import com.example.tiggle.dto.ResponseDto;
 import com.example.tiggle.dto.dutchpay.request.CreateDutchpayRequest;
 import com.example.tiggle.dto.dutchpay.request.DutchpayDetailData;
+import com.example.tiggle.service.account.AccountService;
 import com.example.tiggle.service.dutchpay.DutchpayReadService;
 import com.example.tiggle.service.dutchpay.DutchpayService;
 import com.example.tiggle.service.security.EncryptionService;
@@ -19,6 +20,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/dutchpay/requests")
 @RequiredArgsConstructor
@@ -28,7 +31,7 @@ public class DutchpayController {
 
     private final DutchpayService dutchpayService;
     private final DutchpayReadService dutchpayReadService;
-    private final EncryptionService encryptionService;
+    private final AccountService accountService;
 
     @PostMapping
     @Operation(summary = "더치페이 요청 생성(저장 + FCM 발송)")
@@ -65,4 +68,19 @@ public class DutchpayController {
         Long userId = JwtUtil.getCurrentUserId();
         return ResponseEntity.ok(dutchpayReadService.getDetail(dutchpayId, userId));
     }
+
+    @PostMapping("/{dutchpayId}/pay")
+    public ResponseEntity<Map<String, Boolean>> pay(
+            @PathVariable Long dutchpayId,
+            @RequestBody PayReq req
+    ) {
+        String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
+        Long userId = JwtUtil.getCurrentUserId();
+
+        accountService.payDutchShare(encryptedUserKey, dutchpayId, userId, req.payMore())
+                .block();
+
+        return ResponseEntity.ok(Map.of("result", true));
+    }
+    public record PayReq(boolean payMore) {}
 }

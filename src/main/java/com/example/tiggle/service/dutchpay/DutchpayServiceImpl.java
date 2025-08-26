@@ -83,12 +83,11 @@ public class DutchpayServiceImpl implements DutchpayService {
             s.setDutchpay(d);
             s.setUser(userRepo.getReferenceById(entry.getKey()));
             s.setAmount(entry.getValue());
-            s.setStatus("REQUESTED");
+            s.setStatus("PAID");
             shares.add(s);
         }
         shareRepo.saveAll(shares);
 
-        // 커밋 후 FCM/자동저금 트리거
         eventPublisher.publishEvent(new DutchpayCreatedEvent(
                 d.getId(),
                 d.getTitle(),
