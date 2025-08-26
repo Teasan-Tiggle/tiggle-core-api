@@ -9,9 +9,9 @@ public interface DutchpayDetailProjection {
     String getRequesterName();
     Integer getParticipantCount();
     Long getTotalAmount();
-    LocalDateTime getCreatedAt();
-    Long getMyAmount();          // 내 몫(올림 전)
-    Long getOriginalAmount();    // 있으면 사용, 없으면 myAmount로 대체
+    java.time.LocalDateTime getCreatedAt();
+    Long getMyAmount();
+    Long getOriginalAmount(); // rounded_per_person 별칭과 일치
     Boolean getPayMore();
     Long getCreatorId();
 }

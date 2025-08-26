@@ -23,8 +23,9 @@ public class DutchpayShare {
     @Column(nullable=false)
     private Long amount;
 
-    @Column(nullable=false, length=20)
-    private String status = "REQUESTED";
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    private DutchpayShareStatus status;
 
     private LocalDateTime notifiedAt;
 

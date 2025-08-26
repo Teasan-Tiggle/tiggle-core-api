@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import java.time.Duration;
+import com.example.tiggle.entity.DutchpayShareStatus;
 
 
 import java.math.BigDecimal;
@@ -434,7 +435,7 @@ public class AccountServiceImpl implements AccountService {
                     DutchpayShare share = shareRepo.findByDutchpayIdAndUserId(dutchpayId, userId)
                             .orElseThrow(() -> new IllegalStateException("참여 정보 없음"));
 
-                    if ("PAID".equalsIgnoreCase(share.getStatus())) {
+                    if (share.getStatus() == DutchpayShareStatus.PAID) {
                         log.info("[Dutchpay][pay] already PAID — skip. dpId={}, userId={}", dutchpayId, userId);
                         return new Object[]{dp, share, null}; // 이후 flatMap에서 Mono.empty()로 처리
                     }
@@ -476,10 +477,10 @@ public class AccountServiceImpl implements AccountService {
 
                         return topup.then(
                                 Mono.fromCallable(() -> {
-                                    share.setStatus("PAID");
+                                    share.setStatus(DutchpayShareStatus.PAID);
                                     shareRepo.saveAndFlush(share);
 
-                                    long unpaid = shareRepo.countByDutchpayIdAndStatusNot(dutchpayId, "PAID");
+                                    long unpaid = shareRepo.countByDutchpayIdAndStatusNot(dutchpayId, DutchpayShareStatus.PAID);
                                     if (unpaid == 0 && !"COMPLETED".equalsIgnoreCase(dp.getStatus())) {
                                         dp.setStatus("COMPLETED");
                                         dutchpayRepo.saveAndFlush(dp);
@@ -524,10 +525,10 @@ public class AccountServiceImpl implements AccountService {
 
                                 return topup.then(
                                         Mono.fromCallable(() -> {
-                                            share.setStatus("PAID");
+                                            share.setStatus(DutchpayShareStatus.PAID);
                                             shareRepo.saveAndFlush(share);
 
-                                            long unpaid = shareRepo.countByDutchpayIdAndStatusNot(dutchpayId, "PAID");
+                                            long unpaid = shareRepo.countByDutchpayIdAndStatusNot(dutchpayId, DutchpayShareStatus.PAID);
                                             if (unpaid == 0 && !"COMPLETED".equalsIgnoreCase(dp.getStatus())) {
                                                 dp.setStatus("COMPLETED");
                                                 dutchpayRepo.saveAndFlush(dp);

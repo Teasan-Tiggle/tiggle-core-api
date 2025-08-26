@@ -2,9 +2,14 @@ package com.example.tiggle.repository.dutchpay;
 
 import com.example.tiggle.entity.Dutchpay;
 import com.example.tiggle.repository.dutchpay.projection.DutchpayDetailProjection;
+import com.example.tiggle.repository.dutchpay.projection.DutchpayListItemProjection;
+import com.example.tiggle.repository.dutchpay.projection.DutchpaySummaryProjection;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 public interface DutchpayQueryRepository extends Repository<Dutchpay, Long> {
 
@@ -30,4 +35,70 @@ public interface DutchpayQueryRepository extends Repository<Dutchpay, Long> {
                                         @Param("userId") Long userId);
 
 
+    @Query(value = """
+        SELECT
+          CAST(COALESCE(SUM(IF(ds.status = :transferredStatus, ds.amount, 0)), 0) AS SIGNED) AS totalTransferredAmount,
+          CAST(SUM(IF(ds.status = :transferredStatus, 1, 0)) AS SIGNED)                     AS transferCount,
+          CAST(COUNT(DISTINCT ds.dutchpay_id) AS SIGNED)                                     AS participatedCount
+        FROM dutchpay_share ds
+        WHERE ds.user_id = :userId
+        """, nativeQuery = true)
+    DutchpaySummaryProjection summarizeByUserId(
+            @Param("userId") Long userId,
+            @Param("transferredStatus") String transferredStatus
+    );
+
+    // 진행중: d.status <> 'COMPLETED'
+    @Query(value = """
+        SELECT
+          d.id                                         AS dutchpayId,
+          d.title                                      AS title,
+          CAST(ds_u.amount AS SIGNED)                  AS myAmount,
+          CAST(d.total_amount AS SIGNED)               AS totalAmount,
+          (SELECT COUNT(*) FROM dutchpay_share x WHERE x.dutchpay_id = d.id)                       AS participantCount,
+          (SELECT COUNT(*) FROM dutchpay_share x WHERE x.dutchpay_id = d.id AND x.status = 'PAID') AS paidCount,
+          ds_u.created_at                               AS requestedAt,
+          CASE WHEN d.creator_id = :userId THEN 1 ELSE 0 END                                       AS isCreator
+        FROM dutchpay d
+        JOIN dutchpay_share ds_u ON ds_u.dutchpay_id = d.id AND ds_u.user_id = :userId
+        WHERE d.status <> 'COMPLETED'
+          AND ( :cursorAt IS NULL
+                OR ds_u.created_at < :cursorAt
+                OR (ds_u.created_at = :cursorAt AND d.id < :cursorId) )
+        ORDER BY ds_u.created_at DESC, d.id DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<DutchpayListItemProjection> findInProgressAfter(
+            @Param("userId") Long userId,
+            @Param("cursorAt") LocalDateTime cursorAt,
+            @Param("cursorId") Long cursorId,
+            @Param("limit") int limit
+    );
+
+    // 완료: d.status = 'COMPLETED'
+    @Query(value = """
+        SELECT
+          d.id                                         AS dutchpayId,
+          d.title                                      AS title,
+          CAST(ds_u.amount AS SIGNED)                  AS myAmount,
+          CAST(d.total_amount AS SIGNED)               AS totalAmount,
+          (SELECT COUNT(*) FROM dutchpay_share x WHERE x.dutchpay_id = d.id)                       AS participantCount,
+          (SELECT COUNT(*) FROM dutchpay_share x WHERE x.dutchpay_id = d.id AND x.status = 'PAID') AS paidCount,
+          ds_u.created_at                               AS requestedAt,
+          CASE WHEN d.creator_id = :userId THEN 1 ELSE 0 END                                       AS isCreator
+        FROM dutchpay d
+        JOIN dutchpay_share ds_u ON ds_u.dutchpay_id = d.id AND ds_u.user_id = :userId
+        WHERE d.status = 'COMPLETED'
+          AND ( :cursorAt IS NULL
+                OR ds_u.created_at < :cursorAt
+                OR (ds_u.created_at = :cursorAt AND d.id < :cursorId) )
+        ORDER BY ds_u.created_at DESC, d.id DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<DutchpayListItemProjection> findCompletedAfter(
+            @Param("userId") Long userId,
+            @Param("cursorAt") LocalDateTime cursorAt,
+            @Param("cursorId") Long cursorId,
+            @Param("limit") int limit
+    );
 }
