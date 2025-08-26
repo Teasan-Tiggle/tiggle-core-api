@@ -88,7 +88,9 @@ public class GlobalExceptionHandler {
         logger.error("기부 관련 오류: {} (코드: {})", e.getMessage(), e.getErrorCode());
 
         HttpStatus status = switch (e.getErrorCode()) {
+            case "PRIMARY_ACCOUNT_NOT_FOUND" -> HttpStatus.NOT_FOUND;
             case "USER_ACCOUNT_NOT_FOUND", "UNIVERSITY_ACCOUNT_NOT_FOUND", "ACCOUNT_BALANCE_LACK" -> HttpStatus.BAD_REQUEST;
+            case "EXTERNAL_API_FAILURE" -> HttpStatus.BAD_GATEWAY;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
 
