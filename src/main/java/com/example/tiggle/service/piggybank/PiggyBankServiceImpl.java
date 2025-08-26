@@ -226,8 +226,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
                         return BigDecimal.ZERO;
                     }
                     return res.getRec().getList().stream()
-                            .filter(r -> "D".equalsIgnoreCase(r.getTransactionType()))
-                            // .filter(r -> isUserSavingRecord(r, userId)) // 태그로 더 좁히려면 주석 해제
+                            .filter(this::isDeposit)
                             .map(r -> safeBigDecimal(r.getTransactionBalance()))
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
                 })
@@ -291,7 +290,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
 
                         String standard = toStandardType(req.getType()); // "CHANGE" or "DUTCHPAY"
                         List<SimpleTx> filtered = all.stream()
-                                .filter(tx -> "D".equalsIgnoreCase(tx.typeCode)) // 입금만
+                                .filter(tx -> "IN".equals(tx.typeCode))
                                 .filter(tx -> matchTypeBySummary(tx, standard))
                                 .sorted(Comparator
                                         .comparing((SimpleTx t) -> t.occurredAt).reversed()
@@ -345,18 +344,19 @@ public class PiggyBankServiceImpl implements PiggyBankService {
             LocalDateTime occurredAt = LocalDateTime.of(date, time);
 
             BigDecimal amount = safeBigDecimal(r.getTransactionBalance());
-            if ("W".equalsIgnoreCase(r.getTransactionType())) amount = amount.negate();
+            if (isWithdrawal(r) && amount.signum() > 0) amount = amount.negate();
 
             SimpleTx tx = new SimpleTx();
-            tx.id = r.getTransactionUniqueNo();
+            tx.id         = r.getTransactionUniqueNo();
             tx.occurredAt = occurredAt;
-            tx.amount = amount;
-            tx.summary = r.getTransactionSummary();
-            tx.typeCode = r.getTransactionType();
+            tx.amount     = amount;
+            tx.summary    = Optional.ofNullable(r.getTransactionSummary()).orElse("");
+            tx.typeCode   = isDeposit(r) ? "IN" : (isWithdrawal(r) ? "OUT" : Optional.ofNullable(r.getTransactionType()).orElse(""));
             out.add(tx);
         }
         return out;
     }
+
 
     private BigDecimal safeBigDecimal(String s) {
         if (s == null || s.isBlank()) return BigDecimal.ZERO;
@@ -365,15 +365,21 @@ public class PiggyBankServiceImpl implements PiggyBankService {
 
     private String toStandardType(String reqType) {
         String t = (reqType == null ? "TIGGLE" : reqType).toUpperCase();
-        return "TIGGLE".equals(t) ? "CHANGE" : "DUTCHPAY";
+        if ("CHANGE".equals(t)) return "TIGGLE";  // ← 과거 요청과 호환
+        if ("ALL".equals(t))   return "ALL";      // (선택) 둘 다 보고 싶을 때
+        return "TIGGLE".equals(t) ? "TIGGLE" : "DUTCHPAY";
     }
+
 
     private boolean matchTypeBySummary(SimpleTx tx, String standard) {
         String s = tx.summary == null ? "" : tx.summary;
-        boolean isChange = s.contains("[CHANGE]") || s.contains("자투리");
+        boolean isTiggle = s.contains("[TIGGLE]") || s.contains("[CHANGE]") || s.contains("자투리");
         boolean isDutch  = s.contains("[DUTCH]")  || s.contains("더치페이");
-        return "CHANGE".equals(standard) ? isChange : isDutch;
+
+        if ("ALL".equals(standard)) return isTiggle || isDutch;
+        return "TIGGLE".equals(standard) ? isTiggle : isDutch;
     }
+
 
     private static class Cursor { long epochMilli; String id; }
 
@@ -411,7 +417,7 @@ public class PiggyBankServiceImpl implements PiggyBankService {
         int month = date.getMonthValue();
         LocalDate firstMon = date.withDayOfMonth(1).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));
         int week = (int) (ChronoUnit.WEEKS.between(firstMon, date.with(DayOfWeek.MONDAY)) + 1);
-        String ko = "CHANGE".equals(standardType) ? "자투리 적립" : "더치페이 적립";
+        String ko = "TIGGLE".equals(standardType) ? "자투리 적립" : "더치페이 적립";
         return month + "월의 " + week + "번째 " + ko;
     }
 
@@ -422,4 +428,16 @@ public class PiggyBankServiceImpl implements PiggyBankService {
         String summary;
         String typeCode; // "D"/"W"
     }
+
+    private boolean isDeposit(InquireTransactionHistoryListREC r) {
+        String t = Optional.ofNullable(r.getTransactionType()).orElse("");
+        String n = Optional.ofNullable(r.getTransactionTypeName()).orElse("");
+        return "D".equalsIgnoreCase(t) || "1".equals(t) || n.contains("입금");
+    }
+    private boolean isWithdrawal(InquireTransactionHistoryListREC r) {
+        String t = Optional.ofNullable(r.getTransactionType()).orElse("");
+        String n = Optional.ofNullable(r.getTransactionTypeName()).orElse("");
+        return "W".equalsIgnoreCase(t) || "2".equals(t) || n.contains("출금");
+    }
+
 }

@@ -2,11 +2,14 @@ package com.example.tiggle.service.dutchpay;
 
 import com.example.tiggle.domain.dutchpay.event.DutchpayCreatedEvent;
 import com.example.tiggle.dto.dutchpay.request.CreateDutchpayRequest;
+import com.example.tiggle.dto.dutchpay.request.DutchpayDetailData;
 import com.example.tiggle.entity.Dutchpay;
 import com.example.tiggle.entity.DutchpayShare;
 import com.example.tiggle.entity.Users;
+import com.example.tiggle.repository.dutchpay.DutchpayQueryRepository;
 import com.example.tiggle.repository.dutchpay.DutchpayRepository;
 import com.example.tiggle.repository.dutchpay.DutchpayShareRepository;
+import com.example.tiggle.repository.dutchpay.projection.DutchpayDetailProjection;
 import com.example.tiggle.repository.user.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -25,6 +28,7 @@ public class DutchpayServiceImpl implements DutchpayService {
     private final DutchpayShareRepository shareRepo;
     private final StudentRepository userRepo;
     private final ApplicationEventPublisher eventPublisher;
+    private final DutchpayQueryRepository queryRepo;
 
     @Override
     @Transactional
@@ -83,12 +87,11 @@ public class DutchpayServiceImpl implements DutchpayService {
             s.setDutchpay(d);
             s.setUser(userRepo.getReferenceById(entry.getKey()));
             s.setAmount(entry.getValue());
-            s.setStatus("REQUESTED");
+            s.setStatus("PAID");
             shares.add(s);
         }
         shareRepo.saveAll(shares);
 
-        // 커밋 후 FCM/자동저금 트리거
         eventPublisher.publishEvent(new DutchpayCreatedEvent(
                 d.getId(),
                 d.getTitle(),
@@ -98,5 +101,44 @@ public class DutchpayServiceImpl implements DutchpayService {
                 shareMap,
                 encryptedUserKey
         ));
+    }
+
+    @Override
+    public DutchpayDetailData getDetail(Long dutchpayId, Long userId) {
+        DutchpayDetailProjection p = queryRepo.findDetail(dutchpayId, userId);
+        if (p == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "더치페이를 찾을 수 없습니다.");
+        }
+
+        boolean isCreator = p.getCreatorId() != null && p.getCreatorId().equals(userId);
+
+        if (!isCreator && (p.getMyAmount() == null || p.getMyAmount() == 0L)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "해당 더치페이에 접근 권한이 없습니다.");
+        }
+
+        long original = (p.getOriginalAmount() != null && p.getOriginalAmount() > 0)
+                ? p.getOriginalAmount()
+                : (p.getMyAmount() == null ? 0L : p.getMyAmount());
+
+        long rounded = roundUpTo100(original); // 100원 단위 올림
+        long tiggle  = Math.max(0, rounded - original);
+
+        return new DutchpayDetailData(
+                p.getDutchpayId(),
+                p.getTitle(),
+                p.getMessage(),
+                p.getRequesterName(),
+                p.getParticipantCount() == null ? 0 : p.getParticipantCount(),
+                p.getTotalAmount(),
+                p.getCreatedAt(),
+                rounded,   // 내가 내는 금액(올림값)
+                original,  // 원래 금액
+                tiggle     // 티끌(올림-원래)
+        );
+    }
+
+    private long roundUpTo100(long amount) {
+        if (amount <= 0) return 0;
+        return ((amount + 99) / 100) * 100;
     }
 }
