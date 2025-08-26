@@ -4,7 +4,6 @@ import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.dutchpay.request.CreateDutchpayRequest;
 import com.example.tiggle.dto.dutchpay.request.DutchpayDetailData;
 import com.example.tiggle.service.account.AccountService;
-import com.example.tiggle.service.dutchpay.DutchpayReadService;
 import com.example.tiggle.service.dutchpay.DutchpayService;
 import com.example.tiggle.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,7 +29,6 @@ import org.springframework.web.server.ResponseStatusException;
 public class DutchpayController {
 
     private final DutchpayService dutchpayService;
-    private final DutchpayReadService dutchpayReadService;
     private final AccountService accountService;
 
     @PostMapping
@@ -216,7 +214,7 @@ public class DutchpayController {
         }
 
         Long userId = JwtUtil.getCurrentUserId();
-        DutchpayDetailData body = dutchpayReadService.getDetail(dutchpayId, userId);
+        DutchpayDetailData body = dutchpayService.getDetail(dutchpayId, userId);
         return ResponseEntity.ok(ApiResponse.success(body));
     }
 
