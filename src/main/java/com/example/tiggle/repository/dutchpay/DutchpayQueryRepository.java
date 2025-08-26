@@ -2,10 +2,13 @@ package com.example.tiggle.repository.dutchpay;
 
 import com.example.tiggle.entity.Dutchpay;
 import com.example.tiggle.repository.dutchpay.projection.DutchpayDetailProjection;
+import com.example.tiggle.repository.dutchpay.projection.DutchpayListItemProjection;
 import com.example.tiggle.repository.dutchpay.projection.DutchpaySummaryProjection;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
+
+import java.util.List;
 
 public interface DutchpayQueryRepository extends Repository<Dutchpay, Long> {
 
@@ -44,4 +47,42 @@ public interface DutchpayQueryRepository extends Repository<Dutchpay, Long> {
             @Param("transferredStatus") String transferredStatus
     );
 
+    // 진행중: dutchpay.status != 'COMPLETED'
+    @Query(value = """
+        SELECT
+          d.id                                         AS dutchpayId,
+          d.title                                      AS title,
+          CAST(ds_u.amount AS SIGNED)                  AS myAmount,
+          CAST(d.total_amount AS SIGNED)               AS totalAmount,
+          (SELECT COUNT(*) FROM dutchpay_share x WHERE x.dutchpay_id = d.id)                                       AS participantCount,
+          (SELECT COUNT(*) FROM dutchpay_share x WHERE x.dutchpay_id = d.id AND x.status = 'PAID')                 AS paidCount,
+          ds_u.created_at                              AS requestedAt,
+          CASE WHEN d.creator_id = :userId THEN 1 ELSE 0 END                                                       AS isCreator
+        FROM dutchpay d
+        JOIN dutchpay_share ds_u ON ds_u.dutchpay_id = d.id AND ds_u.user_id = :userId
+        WHERE d.status <> 'COMPLETED'
+        ORDER BY ds_u.created_at DESC
+        """, nativeQuery = true)
+    List<DutchpayListItemProjection> findInProgressByUser(@Param("userId") Long userId, Pageable pageable);
+
+    // 완료: dutchpay.status = 'COMPLETED'
+    @Query(value = """
+        SELECT
+          d.id                                         AS dutchpayId,
+          d.title                                      AS title,
+          CAST(ds_u.amount AS SIGNED)                  AS myAmount,
+          CAST(d.total_amount AS SIGNED)               AS totalAmount,
+          (SELECT COUNT(*) FROM dutchpay_share x WHERE x.dutchpay_id = d.id)                                       AS participantCount,
+          (SELECT COUNT(*) FROM dutchpay_share x WHERE x.dutchpay_id = d.id AND x.status = 'PAID')                 AS paidCount,
+          ds_u.created_at                              AS requestedAt,
+          CASE WHEN d.creator_id = :userId THEN 1 ELSE 0 END                                                       AS isCreator
+        FROM dutchpay d
+        JOIN dutchpay_share ds_u ON ds_u.dutchpay_id = d.id AND ds_u.user_id = :userId
+        WHERE d.status = 'COMPLETED'
+        ORDER BY ds_u.created_at DESC
+        """, nativeQuery = true)
+    List<DutchpayListItemProjection> findCompletedByUser(@Param("userId") Long userId, Pageable pageable);
+
+    @Query(value = "SELECT COUNT(DISTINCT d.id) FROM dutchpay d JOIN dutchpay_share ds_u ON ds_u.dutchpay_id = d.id AND ds_u.user_id = :userId WHERE d.status = 'COMPLETED'", nativeQuery = true)
+    long countCompleted(@Param("userId") Long userId);
 }

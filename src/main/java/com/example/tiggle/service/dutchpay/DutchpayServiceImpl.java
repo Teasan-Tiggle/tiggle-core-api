@@ -4,6 +4,7 @@ import com.example.tiggle.domain.dutchpay.event.DutchpayCreatedEvent;
 import com.example.tiggle.dto.dutchpay.request.CreateDutchpayRequest;
 import com.example.tiggle.entity.Dutchpay;
 import com.example.tiggle.entity.DutchpayShare;
+import com.example.tiggle.entity.DutchpayShareStatus;
 import com.example.tiggle.entity.Users;
 import com.example.tiggle.repository.dutchpay.DutchpayRepository;
 import com.example.tiggle.repository.dutchpay.DutchpayShareRepository;
@@ -79,11 +80,18 @@ public class DutchpayServiceImpl implements DutchpayService {
 
         List<DutchpayShare> shares = new ArrayList<>();
         for (var entry : shareMap.entrySet()) {
+            Long uid = entry.getKey();
+            long amt = entry.getValue();
+
             DutchpayShare s = new DutchpayShare();
             s.setDutchpay(d);
-            s.setUser(userRepo.getReferenceById(entry.getKey()));
-            s.setAmount(entry.getValue());
-            s.setStatus("PAID");
+            s.setUser(userRepo.getReferenceById(uid));
+            s.setAmount(amt);
+
+            s.setStatus(uid.equals(creator.getId())
+                    ? DutchpayShareStatus.PAID
+                    : DutchpayShareStatus.PENDING);
+
             shares.add(s);
         }
         shareRepo.saveAll(shares);
