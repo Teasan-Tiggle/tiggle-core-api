@@ -3,10 +3,7 @@ package com.example.tiggle.controller.donation;
 import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
-import com.example.tiggle.dto.donation.response.DonationGrowthLevel;
-import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
-import com.example.tiggle.dto.donation.response.DonationStatus;
-import com.example.tiggle.dto.donation.response.DonationSummary;
+import com.example.tiggle.dto.donation.response.*;
 import com.example.tiggle.service.donation.DonationService;
 import com.example.tiggle.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -158,9 +155,41 @@ public class DonationController {
      * @return 기부 현황 요약
      */
     @GetMapping("/status/summary")
+    @Operation(summary = "나의 기부 현황 요약 조회", description = "나의 기부 현황 요약을 조회합니다.")
+    @ApiResponses(value = {
+    })
     public ResponseEntity<ApiResponse<DonationSummary>> getDonationSummary() {
         Long userId = JwtUtil.getCurrentUserId();
         DonationSummary response = donationService.getUserDonationSummary(userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 학교 기부 랭킹 조회
+     *
+     * @return 학교 랭킹 목록
+     */
+    @GetMapping("/rank/university")
+    @Operation(summary = "학교 기부 랭킹 조회", description = "학교 기부 랭킹을 조회합니다.")
+    @ApiResponses(value = {
+    })
+    public ResponseEntity<ApiResponse<List<DonationRanking>>> getUniversityRanking() {
+        List<DonationRanking> response = donationService.getUniversityRanking();
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 학과 기부 랭킹 조회
+     *
+     * @return 학교 랭킹 목록
+     */
+    @GetMapping("/rank/department")
+    @Operation(summary = "학과 기부 랭킹 조회", description = "학과 기부 랭킹을 조회합니다.")
+    @ApiResponses(value = {
+    })
+    public ResponseEntity<ApiResponse<List<DonationRanking>>> getDepartmentRanking() {
+        Long userId = JwtUtil.getCurrentUserId();
+        List<DonationRanking> response = donationService.getDepartmentRanking(userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

@@ -3,10 +3,7 @@ package com.example.tiggle.service.donation;
 import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
-import com.example.tiggle.dto.donation.response.DonationGrowthLevel;
-import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
-import com.example.tiggle.dto.donation.response.DonationStatus;
-import com.example.tiggle.dto.donation.response.DonationSummary;
+import com.example.tiggle.dto.donation.response.*;
 import com.example.tiggle.entity.DonationHistory;
 import com.example.tiggle.entity.EsgCategory;
 import com.example.tiggle.entity.University;
@@ -14,6 +11,7 @@ import com.example.tiggle.entity.Users;
 import com.example.tiggle.exception.DonationException;
 import com.example.tiggle.exception.GlobalExceptionHandler;
 import com.example.tiggle.repository.donation.DonationHistoryRepository;
+import com.example.tiggle.repository.donation.RankingProjection;
 import com.example.tiggle.repository.donation.SummaryProjection;
 import com.example.tiggle.repository.esg.EsgCategoryRepository;
 import com.example.tiggle.repository.user.StudentRepository;
@@ -310,5 +308,39 @@ public class DonationServiceImpl implements DonationService {
                 summary.getCategoryCnt() != null ? summary.getCategoryCnt() : 0,
                 universityRank
         );
+    }
+
+    @Override
+    public List<DonationRanking> getUniversityRanking() {
+        List<RankingProjection> list = donationHistoryRepository.getUniversityRanking();
+
+        return list.stream()
+                .map(dto -> new DonationRanking(
+                        dto.getRank(),
+                        dto.getName(),
+                        dto.getAmount()
+                ))
+                .toList();
+    }
+
+    @Override
+    public List<DonationRanking> getDepartmentRanking(Long userId) {
+
+        Users user = studentRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+        Long universityId = Optional.ofNullable(user.getUniversity())
+                .map(University::getId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자 소속 학교 정보가 없습니다."));
+
+        List<RankingProjection> list = donationHistoryRepository.getDepartmentRanking(universityId);
+
+        return list.stream()
+                .map(dto -> new DonationRanking(
+                        dto.getRank(),
+                        dto.getName(),
+                        dto.getAmount()
+                ))
+                .toList();
     }
 }

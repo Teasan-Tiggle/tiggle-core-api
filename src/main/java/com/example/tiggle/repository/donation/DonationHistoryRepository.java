@@ -57,4 +57,29 @@ public interface DonationHistoryRepository extends JpaRepository<DonationHistory
             HAVING u.university.id = :universityId
             """)
     Integer findUniversityRank(@Param("universityId") Long universityId);
+
+    @Query("""
+            SELECT 
+                u.university.name AS name,
+                SUM(d.amount) AS amount,
+                RANK() OVER (ORDER BY SUM(d.amount) DESC) AS rank
+            FROM DonationHistory d
+            JOIN d.user u
+            GROUP BY u.university.name
+            ORDER BY SUM(d.amount) DESC
+            """)
+    List<RankingProjection> getUniversityRanking();
+
+    @Query("""
+            SELECT 
+                u.department.name AS name,
+                SUM(d.amount) AS amount,
+                RANK() OVER (ORDER BY SUM(d.amount) DESC) AS rank
+            FROM DonationHistory d
+            JOIN d.user u
+            WHERE u.university.id = :universityId
+            GROUP BY u.department.name
+            ORDER BY SUM(d.amount) DESC
+            """)
+    List<RankingProjection> getDepartmentRanking(@Param("universityId") Long universityId);
 }
