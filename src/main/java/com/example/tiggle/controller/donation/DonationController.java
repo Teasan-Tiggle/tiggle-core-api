@@ -1,10 +1,12 @@
 package com.example.tiggle.controller.donation;
 
+import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
-import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
 import com.example.tiggle.dto.donation.response.DonationGrowthLevel;
+import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
 import com.example.tiggle.dto.donation.response.DonationStatus;
+import com.example.tiggle.dto.donation.response.DonationSummary;
 import com.example.tiggle.service.donation.DonationService;
 import com.example.tiggle.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,6 +27,25 @@ import java.util.List;
 public class DonationController {
 
     private final DonationService donationService;
+
+    /**
+     * 기부하기
+     *
+     * @return 주계좌 정보
+     */
+    @GetMapping()
+    @Operation(summary = "기부하기", description = "기부하기 전 주계좌 정보를 반환합니다.")
+    @ApiResponses(value = {
+//            @ApiResponse(responseCode = "200", description = "조회 성공"),
+//            @ApiResponse(responseCode = "401", description = "인증 실패"),
+//            @ApiResponse(responseCode = "500", description = "서버 에러")
+    })
+    public ResponseEntity<ApiResponse<PrimaryAccountInfoDto>> getDonation() {
+        Long userId = JwtUtil.getCurrentUserId();
+        String encryptedUserKey = JwtUtil.getCurrentEncryptedUserKey();
+        ApiResponse<PrimaryAccountInfoDto> response = donationService.getDonation(userId, encryptedUserKey).block();
+        return ResponseEntity.ok(response);
+    }
 
     /**
      * 기부하기
@@ -128,6 +149,18 @@ public class DonationController {
     public ResponseEntity<ApiResponse<DonationGrowthLevel>> getGrowth() {
         Long userId = JwtUtil.getCurrentUserId();
         DonationGrowthLevel response = donationService.getDonationGrowthLevel(userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 나의 기부 현황 요약 조회
+     *
+     * @return 기부 현황 요약
+     */
+    @GetMapping("/status/summary")
+    public ResponseEntity<ApiResponse<DonationSummary>> getDonationSummary() {
+        Long userId = JwtUtil.getCurrentUserId();
+        DonationSummary response = donationService.getUserDonationSummary(userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

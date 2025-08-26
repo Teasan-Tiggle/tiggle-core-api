@@ -1,10 +1,12 @@
 package com.example.tiggle.service.donation;
 
+import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
-import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
 import com.example.tiggle.dto.donation.response.DonationGrowthLevel;
+import com.example.tiggle.dto.donation.response.DonationHistoryResponse;
 import com.example.tiggle.dto.donation.response.DonationStatus;
+import com.example.tiggle.dto.donation.response.DonationSummary;
 import com.example.tiggle.entity.DonationHistory;
 import com.example.tiggle.entity.EsgCategory;
 import com.example.tiggle.entity.University;
@@ -12,6 +14,7 @@ import com.example.tiggle.entity.Users;
 import com.example.tiggle.exception.DonationException;
 import com.example.tiggle.exception.GlobalExceptionHandler;
 import com.example.tiggle.repository.donation.DonationHistoryRepository;
+import com.example.tiggle.repository.donation.SummaryProjection;
 import com.example.tiggle.repository.esg.EsgCategoryRepository;
 import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
@@ -48,6 +51,43 @@ public class DonationServiceImpl implements DonationService {
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @Override
+    public Mono<ApiResponse<PrimaryAccountInfoDto>> getDonation(Long userId, String encryptedUserKey) {
+        return Mono.fromCallable(() -> {
+
+                    Users user = studentRepository.findById(userId)
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+                    String userAccountNo = user.getPrimaryAccountNo();
+                    if (userAccountNo == null || userAccountNo.isBlank()) {
+                        throw DonationException.primaryAccountNotFound();
+                    }
+
+                    return user.getPrimaryAccountNo();
+                })
+                .flatMap(accountNo -> {
+
+                    String userKey = encryptionService.decrypt(encryptedUserKey);
+                    return financialApiService.inquireDemandDepositAccount(userKey, accountNo)
+                            .map(response -> {
+                                if (response.getHeader() != null && "H0000".equals(response.getHeader().getResponseCode())) {
+                                    PrimaryAccountInfoDto accountInfo = new PrimaryAccountInfoDto(
+                                            response.getRec().getAccountName(),
+                                            response.getRec().getAccountNo(),
+                                            response.getRec().getAccountBalance()
+                                    );
+                                    logger.info("기부하기 계좌 조회 성공");
+                                    return ApiResponse.success(accountInfo);
+                                } else {
+                                    throw DonationException.externalApiFailure();
+                                }
+                            })
+                            .onErrorResume(throwable -> {
+                                throw DonationException.externalApiFailure();
+                            });
+                });
+    }
+
+    @Override
     @Transactional
     public Mono<ApiResponse<Object>> createDonation(Long userId, String encryptedUserKey, DonationRequest request) {
 
@@ -60,9 +100,9 @@ public class DonationServiceImpl implements DonationService {
                             .orElseThrow(() -> new IllegalArgumentException("기부자 정보를 찾을 수 없습니다."));
 
                     String userAccountNo = user.getPrimaryAccountNo();
-                    if (userAccountNo == null) {
+                    if (userAccountNo == null || userAccountNo.isBlank()) {
                         logger.error("사용자의 주계좌 정보가 없습니다");
-                        throw DonationException.universityAccountNotFound();
+                        throw DonationException.userAccountNotFound();
                     } else {
                         logger.info("사용자의 주계좌: {}", userAccountNo);
                     }
@@ -244,7 +284,7 @@ public class DonationServiceImpl implements DonationService {
 
         // 1. 총 기부금액 조회
         BigDecimal totalAmountBD = donationHistoryRepository.findTotalAmountByUserId(userId);
-        Long totalAmount = totalAmountBD != null ? totalAmountBD.longValue() : 0L;
+        long totalAmount = totalAmountBD != null ? totalAmountBD.longValue() : 0L;
 
         // 2. 레벨 계산
         int level = (int) (totalAmount / LEVEL_AMOUNT);
@@ -253,5 +293,22 @@ public class DonationServiceImpl implements DonationService {
         long toNextLevel = LEVEL_AMOUNT - (totalAmount % LEVEL_AMOUNT);
 
         return new DonationGrowthLevel(totalAmount, toNextLevel, level);
+    }
+
+    @Override
+    public DonationSummary getUserDonationSummary(Long userId) {
+
+        Users user = studentRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+        SummaryProjection summary = donationHistoryRepository.findDonationSummaryByUserId(userId);
+        Integer universityRank = donationHistoryRepository.findUniversityRank(user.getUniversity().getId());
+
+        return new DonationSummary(
+                summary.getTotalAmount() != null ? summary.getTotalAmount().longValue() : 0L,
+                summary.getMonthlyAmount() != null ? summary.getMonthlyAmount().longValue() : 0L,
+                summary.getCategoryCnt() != null ? summary.getCategoryCnt() : 0,
+                universityRank
+        );
     }
 }

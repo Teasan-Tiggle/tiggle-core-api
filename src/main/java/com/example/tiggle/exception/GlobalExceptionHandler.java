@@ -46,7 +46,7 @@ public class GlobalExceptionHandler {
             case "USER_NOT_FOUND", "PASSWORD_MISMATCH" -> HttpStatus.UNAUTHORIZED;
             case "DUPLICATE_EMAIL", "DUPLICATE_STUDENT_ID" -> HttpStatus.CONFLICT;
             case "UNIVERSITY_NOT_FOUND", "DEPARTMENT_NOT_FOUND" -> HttpStatus.BAD_REQUEST;
-            case "EXTERNAL_API_FAILURE", "EXTERNAL_API_USER_CREATION_FAILURE", "EXTERNAL_API_USER_NOT_FOUND" -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case "EXTERNAL_API_FAILURE", "EXTERNAL_API_USER_CREATION_FAILURE", "EXTERNAL_API_USER_NOT_FOUND" -> HttpStatus.BAD_GATEWAY;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
 
@@ -64,7 +64,9 @@ public class GlobalExceptionHandler {
         logger.error("기부 관련 오류: {} (코드: {})", e.getMessage(), e.getErrorCode());
 
         HttpStatus status = switch (e.getErrorCode()) {
+            case "PRIMARY_ACCOUNT_NOT_FOUND" -> HttpStatus.NOT_FOUND;
             case "USER_ACCOUNT_NOT_FOUND", "UNIVERSITY_ACCOUNT_NOT_FOUND", "ACCOUNT_BALANCE_LACK" -> HttpStatus.BAD_REQUEST;
+            case "EXTERNAL_API_FAILURE" -> HttpStatus.BAD_GATEWAY;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
 

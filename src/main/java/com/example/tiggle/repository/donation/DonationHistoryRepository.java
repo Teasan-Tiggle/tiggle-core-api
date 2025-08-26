@@ -37,4 +37,24 @@ public interface DonationHistoryRepository extends JpaRepository<DonationHistory
             "FROM DonationHistory d " +
             "WHERE d.user.id = :userId")
     BigDecimal findTotalAmountByUserId(@Param("userId") Long userId);
+
+    @Query("""
+            SELECT 
+                SUM(d.amount) AS totalAmount,
+                SUM(CASE WHEN FUNCTION('MONTH', d.donatedAt) = FUNCTION('MONTH', CURRENT_DATE) THEN d.amount ELSE 0 END) AS monthlyAmount,
+                COUNT(DISTINCT d.esgCategory.id) AS categoryCnt
+            FROM DonationHistory d
+            WHERE d.user.id = :userId
+            """)
+    SummaryProjection findDonationSummaryByUserId(Long userId);
+
+    @Query("""
+            SELECT 
+                RANK() OVER (ORDER BY SUM(d.amount) DESC) AS rank
+            FROM DonationHistory d
+            JOIN d.user u
+            GROUP BY u.university.id
+            HAVING u.university.id = :universityId
+            """)
+    Integer findUniversityRank(@Param("universityId") Long universityId);
 }
