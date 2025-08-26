@@ -1,5 +1,6 @@
 package com.example.tiggle.dto;
 
+import com.example.tiggle.dto.common.ApiResponse;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Data;
@@ -33,5 +34,17 @@ public class ResponseDto<T> {
         this.result = result;
         this.data = data;
         this.message = message;
+    }
+
+    public static <T> ApiResponse<T> success() {
+        return new ApiResponse<>(true, null, null);
+    }
+
+    public static <T> ApiResponse<T> success(T data) {
+        return new ApiResponse<>(true, null, data);
+    }
+
+    public static <T> ApiResponse<T> failure(String message) {
+        return new ApiResponse<>(false, message, null);
     }
 }

@@ -19,6 +19,9 @@ public interface StudentRepository extends JpaRepository<Users, Long> {
 
     Optional<Users> findByEmail(String email);
 
+    @Query("select u from Users u join fetch u.university where u.id = :id")
+    Optional<Users> findByIdWithUniversity(@Param("id") Long id);
+
     @Query("""
            select u.userKey as userKey, u.primaryAccountNo as primaryAccountNo
              from Users u
