@@ -69,6 +69,10 @@ external-api:
   ssafy:
     base-url: ${SSAFY_API_BASE_URL}
     api-key: ${SSAFY_API_KEY}
+  openai:
+    base-url: ${OPENAI_API_BASE_URL}
+    api-key: ${OPENAI_API_KEY}
+    model: ${OPENAI_API_MODEL}
 
 # Management 설정
 management:
