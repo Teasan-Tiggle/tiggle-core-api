@@ -25,4 +25,6 @@ public interface AccountService {
     Mono<Void> transferTiggleToPiggy(String encryptedUserKey, Long userId, Long dutchpayId, long tiggleAmount);
 
     Mono<Void> transferTiggleIfPayMore(String encryptedUserKey, Long userId, Long dutchpayId, long originalAmount, boolean payMoreSelected);
+
+    Mono<Void> payDutchShare(String encryptedUserKey, Long dutchpayId, Long userId, boolean payMore);
 }
