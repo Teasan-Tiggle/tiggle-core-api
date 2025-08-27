@@ -121,7 +121,7 @@ public class WeeklyAutoSavingScheduler {
                                 long balance;
                                 try { balance = new BigDecimal(balStr).longValue(); } catch (Exception e) { balance = 0L; }
 
-                                long amount = balance % 1000L; // 1000원 미만
+                                long amount = balance % 1000L;
                                 if (amount <= 0) {
                                     log.info("[WeeklyAutoSaving] nothing to sweep (balance={}, remainder={}) userId={}",
                                             balance, amount, owner.getId());
