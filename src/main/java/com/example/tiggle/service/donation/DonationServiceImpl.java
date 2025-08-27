@@ -4,16 +4,15 @@ import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
 import com.example.tiggle.dto.donation.response.*;
-import com.example.tiggle.entity.DonationHistory;
-import com.example.tiggle.entity.EsgCategory;
-import com.example.tiggle.entity.University;
-import com.example.tiggle.entity.Users;
-import com.example.tiggle.exception.DonationException;
+import com.example.tiggle.entity.*;
+import com.example.tiggle.exception.donation.DonationException;
 import com.example.tiggle.exception.GlobalExceptionHandler;
 import com.example.tiggle.repository.donation.DonationHistoryRepository;
+import com.example.tiggle.repository.donation.DonationOrganizationRepository;
 import com.example.tiggle.repository.donation.RankingProjection;
 import com.example.tiggle.repository.donation.SummaryProjection;
 import com.example.tiggle.repository.esg.EsgCategoryRepository;
+import com.example.tiggle.repository.university.UniversityRepository;
 import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
 import com.example.tiggle.service.security.EncryptionService;
@@ -44,7 +43,9 @@ public class DonationServiceImpl implements DonationService {
     private final EncryptionService encryptionService;
     private final StudentRepository studentRepository;
     private final DonationHistoryRepository donationHistoryRepository;
+    private final DonationOrganizationRepository donationOrganizationRepository;
     private final EsgCategoryRepository esgCategoryRepository;
+    private final UniversityRepository universityRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -342,5 +343,82 @@ public class DonationServiceImpl implements DonationService {
                         dto.getAmount()
                 ))
                 .toList();
+    }
+
+    // 학교단위 기부
+    @Override
+    @Transactional
+    public void transferDonations() {
+
+        List<University> universities = universityRepository.findAll();
+
+        for (University uni : universities) {
+            transferThemeDonation(uni, Category.PLANET.getId(), uni.getPlanetAccountNo());
+            transferThemeDonation(uni, Category.PEOPLE.getId(), uni.getPeopleAccountNo());
+            transferThemeDonation(uni, Category.PROSPERITY.getId(), uni.getProsperityAccountNo());
+        }
+    }
+
+    // 학교 테마별 계좌 -> 기부단체
+    private void transferThemeDonation(University university, Long categoryId, String uniAccountNo) {
+
+        Mono.fromCallable(() -> {
+
+                    // 1. 단체 계좌 찾기
+                    DonationOrganization organization = donationOrganizationRepository.findByEsgCategory_id(categoryId)
+                            .orElseThrow(() -> new IllegalArgumentException("기부단체 정보를 찾을 수 없습니다."));
+
+                    String orgAccountNo = organization.getAccountNo();
+                    if (orgAccountNo == null || orgAccountNo.isBlank()) {
+                        logger.error("기부단체의 계좌 정보가 없습니다");
+                        throw DonationException.organizationAccountNotFound();
+                    } else {
+                        logger.info("기부단체 계좌: {}", orgAccountNo);
+                    }
+
+                    // 2. 학교 계좌 확인
+                    if (uniAccountNo == null || uniAccountNo.isBlank())  {
+                        logger.error("학교의 계좌 정보가 없습니다");
+                        throw DonationException.universityAccountNotFound();
+                    } else {
+                        logger.info("학교 계좌: {}", uniAccountNo);
+                    }
+
+                    return new Object[]{organization.getName(), orgAccountNo};
+                })
+                .flatMap(obj -> {
+
+                    String orgName = (String) ((Object[]) obj)[0];
+                    String orgAccountNo = (String) ((Object[]) obj)[1];
+
+                    // 3. 학교 계정 찾기
+                    String email = university.getEmail();
+                    if (email == null || email.isBlank())  {
+                        logger.error("학교의 계정 정보가 없습니다");
+                        throw DonationException.universityAccountNotFound();
+                    } else {
+                        logger.info("학교 계정: {}", email);
+                    }
+
+                    return financialApiService.searchUser(university.getEmail())
+                            .flatMap(universityResponse -> {
+
+                                String userKey = encryptionService.decrypt(universityResponse.getUserKey());
+
+                                // 4. 계좌 잔고 확인
+                                return financialApiService.inquireDemandDepositAccountBalance(userKey, uniAccountNo)
+                                        .flatMap(balanceResponse -> {
+                                            Long balance = Long.parseLong(balanceResponse.getRec().getAccountBalance());
+                                            if (balance < 1000) {
+                                                logger.error("계좌 잔고 부족: {}", balanceResponse);
+                                                return null;
+                                            }
+
+                                            // 5. 싸피 금융 API - 계좌이체 실행
+                                            return financialApiService.updateDemandDepositAccountTransfer(userKey, orgAccountNo, university.getName(), balance.toString(), uniAccountNo, orgName)
+                                                    .onErrorMap(e -> DonationException.externalApiFailure());
+                                        });
+                            });
+                }).subscribeOn(Schedulers.boundedElastic());
     }
 }

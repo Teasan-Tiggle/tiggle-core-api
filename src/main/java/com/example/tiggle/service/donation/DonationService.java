@@ -4,6 +4,7 @@ import com.example.tiggle.dto.account.response.PrimaryAccountInfoDto;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
 import com.example.tiggle.dto.donation.response.*;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -29,4 +30,7 @@ public interface DonationService {
     List<DonationRanking> getUniversityRanking();
 
     List<DonationRanking> getDepartmentRanking(Long userId);
+
+    @Transactional
+    void transferDonations();
 }
