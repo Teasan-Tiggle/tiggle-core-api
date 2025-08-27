@@ -364,16 +364,16 @@ public class AccountServiceImpl implements AccountService {
                 .flatMap(link ->
                         financialApiService.updateDemandDepositAccountTransfer(
                                         link.userKey(),
-                                        link.piggyAccountNo(),                  // 입금: 저금통
-                                        "[TIGGLE][PM] U" + userId + " DP" + dutchpayId,
+                                        link.piggyAccountNo(),
+                                        "[DUTCH][PM][UID:" + userId + "] DP" + dutchpayId,
                                         String.valueOf(tiggleAmount),
-                                        link.primaryAccountNo(),                // 출금: 대표계좌
-                                        "티끌 저금 출금(#" + dutchpayId + ")"
+                                        link.primaryAccountNo(),
+                                        "더치페이 잔액 반올림 저축 (DP" + dutchpayId + ")"
                                 )
                                 .timeout(Duration.ofSeconds(5))
                                 .map(resp -> {
                                     boolean ok = resp.getHeader() != null && "H0000".equals(resp.getHeader().getResponseCode());
-                                    log.info("[TIGGLE][PM] transfer result ok={}, userId={}, dpId={}, amount={}",
+                                    log.info("[DUTCH][PM] transfer result ok={}, userId={}, dpId={}, amount={}",
                                             ok, userId, dutchpayId, tiggleAmount);
                                     if (!ok) {
                                         String msg = resp.getHeader() == null ? "응답 헤더 없음" : resp.getHeader().getResponseMessage();
@@ -384,22 +384,22 @@ public class AccountServiceImpl implements AccountService {
                 )
                 .flatMap(resp ->
                         Mono.fromCallable(() -> {
-                            // 원 단위라면 scale(0)도 가능: BigDecimal.valueOf(tiggleAmount)
                             piggyBankWriterService.applyTiggle(userId, BigDecimal.valueOf(tiggleAmount));
                             return true;
                         }).subscribeOn(Schedulers.boundedElastic())
                 )
                 .then()
                 .onErrorResume(org.springframework.web.reactive.function.client.WebClientResponseException.class, e -> {
-                    log.warn("티끌 자동저금 실패 userId={}, dutchpayId={}, status={}, headers={}, body={}",
+                    log.warn("더치페이 자투리 저축 실패 userId={}, dutchpayId={}, status={}, headers={}, body={}",
                             userId, dutchpayId, e.getStatusCode(), e.getHeaders(), e.getResponseBodyAsString(), e);
-                    return Mono.error(e); // 테스트 중에는 에러 드러내기
+                    return Mono.error(e);
                 })
                 .onErrorResume(e -> {
-                    log.warn("티끌 자동저금 실패(일반) userId={}, dutchpayId={}, msg={}", userId, dutchpayId, e.getMessage(), e);
-                    return Mono.error(e); // 테스트 중에는 에러 드러내기
+                    log.warn("더치페이 자투리 저축 실패(일반) userId={}, dutchpayId={}, msg={}", userId, dutchpayId, e.getMessage(), e);
+                    return Mono.error(e);
                 });
     }
+
 
     private LinkedAccounts getLinkedAccounts(String userKey, Long userId) {
         var piggy = piggyBankRepository.findByOwner_Id(userId)

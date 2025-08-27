@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 public interface PiggyBankRepository extends JpaRepository<PiggyBank, Long> {
@@ -18,4 +19,6 @@ public interface PiggyBankRepository extends JpaRepository<PiggyBank, Long> {
             "where p.owner.id = :userId")
     int incrementBalanceAndCount(@Param("userId") Long userId,
                                  @Param("amount") BigDecimal amount);
+
+    List<PiggyBank> findAllByAutoSavingTrue();
 }

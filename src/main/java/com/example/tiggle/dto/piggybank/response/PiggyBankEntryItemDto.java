@@ -9,6 +9,6 @@ public class PiggyBankEntryItemDto {
     private String id;
     private String type;           // "CHANGE" or "DUTCHPAY"
     private BigDecimal amount;
-    private OffsetDateTime occurredAt;
+    String occurredDate;
     private String title;          // "8월의 4번째 자투리 적립"
 }
