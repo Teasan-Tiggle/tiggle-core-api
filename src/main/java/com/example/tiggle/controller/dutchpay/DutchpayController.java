@@ -32,6 +32,7 @@ public class DutchpayController {
 
     private final DutchpayService dutchpayService;
     private final AccountService accountService;
+    public enum DutchpayTab { IN_PROGRESS, COMPLETED }
 
     @PostMapping
     @Operation(
@@ -319,18 +320,14 @@ public class DutchpayController {
     }
 
     @GetMapping("/list")
-    @Operation(summary = "더치페이 내역(커서 기반)", description = "진행중/완료 탭, 커서 기반 keyset 페이징")
     public ResponseEntity<ApiResponse<DutchpayListResponse>> getDutchpayList(
-            @RequestHeader("Authorization") String authorization,
-            @RequestParam(required = false, defaultValue = "IN_PROGRESS") String tab,
+            @RequestParam(defaultValue = "IN_PROGRESS") DutchpayTab tab,
             @RequestParam(required = false) String cursor,
-            @RequestParam(required = false, defaultValue = "20") Integer size
+            @RequestParam(defaultValue = "20") Integer size
     ) {
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효한 인증 토큰이 필요합니다.");
-        }
         Long userId = JwtUtil.getCurrentUserId();
-        var data = dutchpayService.getDutchpayListCursor(userId, tab, cursor, size);
+        boolean completed = (tab == DutchpayTab.COMPLETED);
+        var data = dutchpayService.getDutchpayListCursor(userId, completed ? "COMPLETED" : "IN_PROGRESS", cursor, size);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 }

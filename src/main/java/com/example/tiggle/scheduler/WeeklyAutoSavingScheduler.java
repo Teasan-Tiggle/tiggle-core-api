@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.*;
@@ -37,6 +38,7 @@ public class WeeklyAutoSavingScheduler {
     private static final DateTimeFormatter WEEK_TAG_FMT = DateTimeFormatter.BASIC_ISO_DATE; // yyyyMMdd (월요일)
 
     @Scheduled(cron = "0 0 18 ? * SUN", zone = "Asia/Seoul")
+    @Transactional(readOnly = true)
     public void runWeeklyChangeSweep() {
         log.info("[WeeklyAutoSaving] START (KST now={})", ZonedDateTime.now(KST));
 
