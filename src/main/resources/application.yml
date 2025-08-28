@@ -99,5 +99,10 @@ firebase:
 google:
   cloud:
     text-to-speech:
-      project-id: ${GOOGLE_TTS_PROJECT_ID}
-      credentials: ${GOOGLE_TTS_CREDENTIALS}
+      project-id: ${GOOGLE_PROJECT_ID}
+      credentials: ${GOOGLE_CREDENTIALS}
+  # Google Veo 3 Video Generation 설정
+  genai:
+    project-id: ${GOOGLE_PROJECT_ID}
+    location: ${GOOGLE_GENAI_LOCATION:us-central1}
+    credentials: ${GOOGLE_CREDENTIALS}

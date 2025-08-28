@@ -69,6 +69,10 @@ dependencies {
 
     // Google Cloud Text-to-Speech
     implementation 'com.google.cloud:google-cloud-texttospeech:2.40.0'
+    
+    // Google Cloud Core for Vertex AI REST API
+    implementation 'com.google.cloud:google-cloud-core:2.45.0'
+    implementation 'com.google.auth:google-auth-library-oauth2-http:1.29.0'
 }
 
 tasks.named('test') {
