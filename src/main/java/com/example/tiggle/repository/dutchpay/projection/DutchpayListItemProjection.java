@@ -9,4 +9,5 @@ public interface DutchpayListItemProjection {
     Integer getPaidCount();
     java.time.LocalDateTime getRequestedAt();
     Integer getIsCreator(); // 1 or 0
+    String getCreatorName();
 }

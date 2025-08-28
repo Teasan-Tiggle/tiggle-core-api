@@ -72,9 +72,6 @@ dependencies {
 
     // Google Cloud Vertex AI (Imagen)
     implementation 'com.google.cloud:google-cloud-aiplatform:3.54.0'
-
-    // Batch
-    implementation 'org.springframework.boot:spring-boot-starter-batch'
 }
 
 tasks.named('test') {
