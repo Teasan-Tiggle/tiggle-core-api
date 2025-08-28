@@ -6,5 +6,7 @@ import lombok.Builder;
 public record DutchpaySummaryResponse(
         long totalTransferredAmount,
         long transferCount,
-        long participatedCount
+        long participatedCount,
+        long inProgressCount,
+        long completedCount
 ) {}

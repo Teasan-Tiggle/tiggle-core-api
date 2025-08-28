@@ -1,0 +1,16 @@
+package com.example.tiggle.repository.dutchpay.projection;
+
+import java.time.LocalDateTime;
+
+public interface DutchpayDetailHeaderProjection {
+    Long getDutchpayId();
+    String getTitle();
+    String getMessage();
+    Long getTotalAmount();
+    String getStatus();
+    Long getRoundedPerPerson();
+    Boolean getPayMore();
+    LocalDateTime getCreatedAt();
+    Long getCreatorId();
+    String getCreatorName();
+}

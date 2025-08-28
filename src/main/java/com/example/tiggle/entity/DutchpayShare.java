@@ -31,5 +31,26 @@ public class DutchpayShare {
 
     @CreationTimestamp
     private LocalDateTime createdAt;
+
+    @Column(name = "pay_more", nullable = false)
+    private boolean payMore;
+
+    /** 결제 시 확정된 자투리 금액 (roundUp(100) - amount), 미선택이면 0 */
+    @Column(name = "tiggle_amount", nullable = false)
+    private long tiggleAmount;
+
+    /** 실제 납부 금액 (amount + tiggleAmount) */
+    @Column(name = "paid_amount", nullable = false)
+    private long paidAmount;
+
+    public void settle(boolean payMoreSelected, long topUp) {
+        this.payMore = payMoreSelected;
+        long tiggle = Math.max(0L, topUp);
+        this.tiggleAmount = tiggle;
+        this.paidAmount   = (this.amount == null ? 0L : this.amount) + tiggle;
+        this.status = DutchpayShareStatus.PAID;
+        this.notifiedAt = java.time.LocalDateTime.now();
+    }
+
 }
 
