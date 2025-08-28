@@ -3,6 +3,7 @@ package com.example.tiggle.controller.dutchpay;
 import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.dutchpay.request.CreateDutchpayRequest;
 import com.example.tiggle.dto.dutchpay.request.DutchpayDetailData;
+import com.example.tiggle.dto.dutchpay.response.DutchpayDetailResponse;
 import com.example.tiggle.dto.dutchpay.response.DutchpayListResponse;
 import com.example.tiggle.dto.dutchpay.response.DutchpaySummaryResponse;
 import com.example.tiggle.service.account.AccountService;
@@ -32,6 +33,7 @@ public class DutchpayController {
 
     private final DutchpayService dutchpayService;
     private final AccountService accountService;
+    public enum DutchpayTab { IN_PROGRESS, COMPLETED }
 
     @PostMapping
     @Operation(
@@ -207,16 +209,15 @@ public class DutchpayController {
                     )
             )
     )
-    public ResponseEntity<ApiResponse<DutchpayDetailData>> getDetail(
+    public ResponseEntity<ApiResponse<DutchpayDetailResponse>> getDetail(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @PathVariable("id") Long dutchpayId
     ) {
         if (authorization == null || !authorization.startsWith("Bearer ")) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효한 인증 토큰이 필요합니다.");
         }
-
         Long userId = JwtUtil.getCurrentUserId();
-        DutchpayDetailData body = dutchpayService.getDetail(dutchpayId, userId);
+        var body = dutchpayService.getDetail(dutchpayId, userId);
         return ResponseEntity.ok(ApiResponse.success(body));
     }
 
@@ -319,18 +320,14 @@ public class DutchpayController {
     }
 
     @GetMapping("/list")
-    @Operation(summary = "더치페이 내역(커서 기반)", description = "진행중/완료 탭, 커서 기반 keyset 페이징")
     public ResponseEntity<ApiResponse<DutchpayListResponse>> getDutchpayList(
-            @RequestHeader("Authorization") String authorization,
-            @RequestParam(required = false, defaultValue = "IN_PROGRESS") String tab,
+            @RequestParam(defaultValue = "IN_PROGRESS") DutchpayTab tab,
             @RequestParam(required = false) String cursor,
-            @RequestParam(required = false, defaultValue = "20") Integer size
+            @RequestParam(defaultValue = "20") Integer size
     ) {
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효한 인증 토큰이 필요합니다.");
-        }
         Long userId = JwtUtil.getCurrentUserId();
-        var data = dutchpayService.getDutchpayListCursor(userId, tab, cursor, size);
+        boolean completed = (tab == DutchpayTab.COMPLETED);
+        var data = dutchpayService.getDutchpayListCursor(userId, completed ? "COMPLETED" : "IN_PROGRESS", cursor, size);
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 }

@@ -3,6 +3,7 @@ package com.example.tiggle.service.dutchpay;
 import com.example.tiggle.domain.dutchpay.event.DutchpayCreatedEvent;
 import com.example.tiggle.dto.dutchpay.request.CreateDutchpayRequest;
 import com.example.tiggle.dto.dutchpay.request.DutchpayDetailData;
+import com.example.tiggle.dto.dutchpay.response.DutchpayDetailResponse;
 import com.example.tiggle.dto.dutchpay.response.DutchpayListItemResponse;
 import com.example.tiggle.dto.dutchpay.response.DutchpayListResponse;
 import com.example.tiggle.dto.dutchpay.response.DutchpaySummaryResponse;
@@ -13,7 +14,6 @@ import com.example.tiggle.entity.Users;
 import com.example.tiggle.repository.dutchpay.DutchpayQueryRepository;
 import com.example.tiggle.repository.dutchpay.DutchpayRepository;
 import com.example.tiggle.repository.dutchpay.DutchpayShareRepository;
-import com.example.tiggle.repository.dutchpay.projection.DutchpayDetailProjection;
 import com.example.tiggle.repository.dutchpay.projection.DutchpayListItemProjection;
 import com.example.tiggle.repository.piggybank.PiggyBankRepository;
 import com.example.tiggle.repository.user.StudentRepository;
@@ -112,9 +112,16 @@ public class DutchpayServiceImpl implements DutchpayService {
             s.setDutchpay(d);
             s.setUser(userRepo.getReferenceById(uid));
             s.setAmount(amt);
-            s.setStatus(uid.equals(creator.getId())
-                    ? DutchpayShareStatus.PAID
-                    : DutchpayShareStatus.PENDING);
+
+            if (uid.equals(creator.getId())) {
+                s.setStatus(DutchpayShareStatus.PAID);
+                s.setPayMore(false);
+                s.setTiggleAmount(0L);
+                s.setPaidAmount(amt);
+                s.setNotifiedAt(java.time.LocalDateTime.now());
+            } else {
+                s.setStatus(DutchpayShareStatus.PENDING);
+            }
             shares.add(s);
         }
         shareRepo.saveAll(shares);
@@ -134,36 +141,50 @@ public class DutchpayServiceImpl implements DutchpayService {
     /* ================== DETAIL ================== */
     @Override
     @Transactional(readOnly = true)
-    public DutchpayDetailData getDetail(Long dutchpayId, Long userId) {
-        DutchpayDetailProjection p = queryRepo.findDetail(dutchpayId, userId);
-        if (p == null) {
+    public DutchpayDetailResponse  getDetail(Long dutchpayId, Long userId) {
+        // 1) 헤더 로드
+        var h = queryRepo.findDetailHeader(dutchpayId);
+        if (h == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "더치페이를 찾을 수 없습니다.");
         }
 
-        boolean isCreator = p.getCreatorId() != null && p.getCreatorId().equals(userId);
+        // 2) 참여자 목록 로드
+        var rows = queryRepo.findDetailShares(dutchpayId);
+        if (rows == null || rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "참여자 정보가 없습니다.");
+        }
 
-        if (!isCreator && (p.getMyAmount() == null || p.getMyAmount() == 0L)) {
+        // 3) 권한 체크: 생성자이거나, shares에 내가 포함되어 있어야 함
+        boolean isCreator = h.getCreatorId() != null && h.getCreatorId().equals(userId);
+        boolean isParticipant = rows.stream().anyMatch(r -> r.getUserId().equals(userId));
+        if (!isCreator && !isParticipant) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "해당 더치페이에 접근 권한이 없습니다.");
         }
 
-        long original = (p.getOriginalAmount() != null && p.getOriginalAmount() > 0)
-                ? p.getOriginalAmount()
-                : (p.getMyAmount() == null ? 0L : p.getMyAmount());
+        // 4) 매핑
+        var shares = rows.stream()
+                .map(r -> new com.example.tiggle.dto.dutchpay.response.DutchpayDetailResponse.Share(
+                        r.getUserId(),
+                        r.getUserName(),
+                        r.getAmount(),
+                        r.getStatus()
+                ))
+                .toList();
 
-        long rounded = roundUpTo100(original); // 100원 단위 올림
-        long tiggle  = Math.max(0, rounded - original);
-
-        return new DutchpayDetailData(
-                p.getDutchpayId(),
-                p.getTitle(),
-                p.getMessage(),
-                p.getRequesterName(),
-                p.getParticipantCount() == null ? 0 : p.getParticipantCount(),
-                p.getTotalAmount(),
-                p.getCreatedAt(),
-                rounded,   // 내가 내는 금액(올림값)
-                original,  // 원래 금액
-                tiggle     // 티끌(올림-원래)
+        return new DutchpayDetailResponse(
+                h.getDutchpayId(),
+                h.getTitle(),
+                h.getMessage(),
+                h.getTotalAmount(),
+                h.getStatus(),
+                new com.example.tiggle.dto.dutchpay.response.DutchpayDetailResponse.Creator(
+                        h.getCreatorId(),
+                        h.getCreatorName()
+                ),
+                shares,
+                h.getRoundedPerPerson(),
+                h.getPayMore(),
+                h.getCreatedAt()
         );
     }
 
@@ -189,18 +210,28 @@ public class DutchpayServiceImpl implements DutchpayService {
             nextCursor = toCursor(last.getRequestedAt(), last.getDutchpayId());
         }
 
-        var items = rows.stream().map(r ->
-                DutchpayListItemResponse.builder()
-                        .dutchpayId(r.getDutchpayId())
-                        .title(r.getTitle())
-                        .myAmount(nvl(r.getMyAmount()))
-                        .totalAmount(nvl(r.getTotalAmount()))
-                        .participantCount(nvlI(r.getParticipantCount()))
-                        .paidCount(nvlI(r.getPaidCount()))
-                        .requestedAt(r.getRequestedAt())
-                        .isCreator(nvlI(r.getIsCreator()) == 1)
-                        .build()
-        ).toList();
+        var items = rows.stream().map(r -> {
+            long myAmt = nvl(r.getMyAmount());
+
+            boolean paid     = "PAID".equalsIgnoreCase(r.getMyStatus());
+            boolean payMore  = nvlI(r.getMyPayMore()) == 1;
+            long tiggleSaved = nvl(r.getMyTiggleAmount());
+            long tiggle      = (paid && payMore) ? tiggleSaved : 0L;
+
+            return DutchpayListItemResponse.builder()
+                    .dutchpayId(r.getDutchpayId())
+                    .title(r.getTitle())
+                    .myAmount(myAmt)
+                    .totalAmount(nvl(r.getTotalAmount()))
+                    .participantCount(nvlI(r.getParticipantCount()))
+                    .paidCount(nvlI(r.getPaidCount()))
+                    .requestedAt(r.getRequestedAt())
+                    .isCreator(nvlI(r.getIsCreator()) == 1)
+                    .creatorName(r.getCreatorName())
+                    .tiggleAmount(tiggle)
+                    .build();
+        }).toList();
+
 
         return DutchpayListResponse.builder()
                 .items(items)
@@ -254,11 +285,16 @@ public class DutchpayServiceImpl implements DutchpayService {
         }
 
         long participated = shareRepo.countDistinctDutchpayByUser(userId);
+        var statusCnt = queryRepo.countStatusByUserId(userId);
+        long inProgress = (statusCnt == null || statusCnt.getInProgressCount() == null) ? 0L : statusCnt.getInProgressCount();
+        long completed  = (statusCnt == null || statusCnt.getCompletedCount() == null)  ? 0L : statusCnt.getCompletedCount();
 
         return DutchpaySummaryResponse.builder()
                 .totalTransferredAmount(total)
                 .transferCount(count)
                 .participatedCount(participated)
+                .inProgressCount(inProgress)
+                .completedCount(completed)
                 .build();
     }
 
