@@ -1,6 +1,8 @@
 package com.example.tiggle.service.image;
 
+import java.util.List;
+
 public interface ImageGenerationService {
 
-    byte[] generateImage(String prompt);
+    List<byte[]> generateImageSeriesByScript(String script);
 }
