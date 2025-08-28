@@ -18,6 +18,9 @@ public class University {
     @Column(name = "email", unique = true, nullable = false)
     private String email;
 
+    @Column(name = "user_key", unique = true, nullable = false)
+    private String userKey;
+
     @Column(name = "planet_account_no", length = 30, nullable = false)
     private String planetAccountNo;
 

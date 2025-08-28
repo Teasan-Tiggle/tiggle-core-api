@@ -33,4 +33,7 @@ public interface DonationService {
 
     @Transactional
     void transferDonations();
+
+    @Transactional(readOnly = true)
+    void updateRankingCache();
 }

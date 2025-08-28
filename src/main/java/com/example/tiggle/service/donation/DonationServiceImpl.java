@@ -5,8 +5,8 @@ import com.example.tiggle.dto.common.ApiResponse;
 import com.example.tiggle.dto.donation.request.DonationRequest;
 import com.example.tiggle.dto.donation.response.*;
 import com.example.tiggle.entity.*;
-import com.example.tiggle.exception.donation.DonationException;
 import com.example.tiggle.exception.GlobalExceptionHandler;
+import com.example.tiggle.exception.donation.DonationException;
 import com.example.tiggle.repository.donation.DonationHistoryRepository;
 import com.example.tiggle.repository.donation.DonationOrganizationRepository;
 import com.example.tiggle.repository.donation.RankingProjection;
@@ -23,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -46,6 +47,7 @@ public class DonationServiceImpl implements DonationService {
     private final DonationOrganizationRepository donationOrganizationRepository;
     private final EsgCategoryRepository esgCategoryRepository;
     private final UniversityRepository universityRepository;
+    private final DonationRankingStore rankingStore;
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -313,6 +315,7 @@ public class DonationServiceImpl implements DonationService {
 
     @Override
     public List<DonationRanking> getUniversityRanking() {
+
         List<RankingProjection> list = donationHistoryRepository.getUniversityRanking();
 
         return list.stream()
@@ -364,61 +367,89 @@ public class DonationServiceImpl implements DonationService {
 
         Mono.fromCallable(() -> {
 
-                    // 1. 단체 계좌 찾기
-                    DonationOrganization organization = donationOrganizationRepository.findByEsgCategory_id(categoryId)
-                            .orElseThrow(() -> new IllegalArgumentException("기부단체 정보를 찾을 수 없습니다."));
+                    // 1. 단체 목록 조회
+                    List<DonationOrganization> organizations = donationOrganizationRepository.findByEsgCategory_id(categoryId);
 
-                    String orgAccountNo = organization.getAccountNo();
-                    if (orgAccountNo == null || orgAccountNo.isBlank()) {
-                        logger.error("기부단체의 계좌 정보가 없습니다");
+                    if (organizations == null || organizations.isEmpty()) {
                         throw DonationException.organizationAccountNotFound();
-                    } else {
-                        logger.info("기부단체 계좌: {}", orgAccountNo);
                     }
 
                     // 2. 학교 계좌 확인
-                    if (uniAccountNo == null || uniAccountNo.isBlank())  {
+                    if (uniAccountNo == null || uniAccountNo.isBlank()) {
                         logger.error("학교의 계좌 정보가 없습니다");
                         throw DonationException.universityAccountNotFound();
                     } else {
                         logger.info("학교 계좌: {}", uniAccountNo);
                     }
 
-                    return new Object[]{organization.getName(), orgAccountNo};
+                    return organizations;
                 })
-                .flatMap(obj -> {
+                .flatMapMany(organizations -> {
 
-                    String orgName = (String) ((Object[]) obj)[0];
-                    String orgAccountNo = (String) ((Object[]) obj)[1];
-
-                    // 3. 학교 계정 찾기
-                    String email = university.getEmail();
-                    if (email == null || email.isBlank())  {
+                    String userKey = encryptionService.decrypt(university.getUserKey());
+                    if (userKey == null || userKey.isBlank()) {
                         logger.error("학교의 계정 정보가 없습니다");
                         throw DonationException.universityAccountNotFound();
-                    } else {
-                        logger.info("학교 계정: {}", email);
                     }
 
-                    return financialApiService.searchUser(university.getEmail())
-                            .flatMap(universityResponse -> {
+                    // 3. 계좌 잔고 확인
+                    return financialApiService.inquireDemandDepositAccountBalance(userKey, uniAccountNo)
+                            .flatMapMany(balanceResponse -> {
+                                long totalBalance = Long.parseLong(balanceResponse.getRec().getAccountBalance());
+                                if (totalBalance < 1000) {
+                                    logger.warn("계좌 잔고 부족: {}", totalBalance);
+                                    return Mono.empty();
+                                } else {
+                                    logger.info("{} {} 계좌 잔고: {}", university.getName(), categoryId, totalBalance);
+                                }
 
-                                String userKey = encryptionService.decrypt(universityResponse.getUserKey());
+                                // 4. 단체 수로 나눠서 1/N씩 기부
+                                int orgCount = organizations.size();
+                                Long amountPerOrg = totalBalance / orgCount;
 
-                                // 4. 계좌 잔고 확인
-                                return financialApiService.inquireDemandDepositAccountBalance(userKey, uniAccountNo)
-                                        .flatMap(balanceResponse -> {
-                                            Long balance = Long.parseLong(balanceResponse.getRec().getAccountBalance());
-                                            if (balance < 1000) {
-                                                logger.error("계좌 잔고 부족: {}", balanceResponse);
-                                                return null;
+                                // 5. 싸피 금융 API - 계좌이체 실행
+                                return Flux.fromIterable(organizations)
+                                        .flatMap(org -> {
+
+                                            String orgAccountNo = org.getAccountNo();
+                                            if (orgAccountNo == null || orgAccountNo.isBlank()) {
+                                                logger.error("기부단체의 계좌 정보가 없습니다");
+                                                return Mono.error(DonationException.organizationAccountNotFound());
+                                            } else {
+                                                logger.info("기부단체 계좌: {}", orgAccountNo);
                                             }
 
-                                            // 5. 싸피 금융 API - 계좌이체 실행
-                                            return financialApiService.updateDemandDepositAccountTransfer(userKey, orgAccountNo, university.getName(), balance.toString(), uniAccountNo, orgName)
-                                                    .onErrorMap(e -> DonationException.externalApiFailure());
+                                            logger.info("이체: {} -> {} amount={}", uniAccountNo, org.getAccountNo(), amountPerOrg);
+                                            return financialApiService.updateDemandDepositAccountTransfer(
+                                                    userKey,
+                                                    orgAccountNo,
+                                                    university.getName(),
+                                                    amountPerOrg.toString(),
+                                                    uniAccountNo,
+                                                    org.getName()
+                                            ).onErrorMap(e -> DonationException.externalApiFailure());
                                         });
                             });
-                }).subscribeOn(Schedulers.boundedElastic());
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe(
+                        result -> logger.info("계좌이체 성공: {}", result),
+                        error -> logger.error("계좌이체 실패: ", error)
+                );
+    }
+
+    // 기부 랭킹 캐싱
+    @Override
+    @Transactional(readOnly = true)
+    public void updateRankingCache() {
+
+        List<Object[]> results = donationHistoryRepository.sumByUniversity();
+        rankingStore.saveUniversityRanking(results);
+
+        List<University> universities = universityRepository.findAll();
+
+        for (University uni : universities) {
+            rankingStore.saveDepartmentRanking(uni.getId(), donationHistoryRepository.sumByDepartment(uni.getId()));
+        }
     }
 }
