@@ -15,6 +15,7 @@ import com.example.tiggle.repository.dutchpay.DutchpayQueryRepository;
 import com.example.tiggle.repository.dutchpay.DutchpayRepository;
 import com.example.tiggle.repository.dutchpay.DutchpayShareRepository;
 import com.example.tiggle.repository.dutchpay.projection.DutchpayListItemProjection;
+import com.example.tiggle.repository.dutchpay.projection.DutchpayShareBriefProjection;
 import com.example.tiggle.repository.piggybank.PiggyBankRepository;
 import com.example.tiggle.repository.user.StudentRepository;
 import com.example.tiggle.service.finopenapi.FinancialApiService;
@@ -92,6 +93,8 @@ public class DutchpayServiceImpl implements DutchpayService {
                 shareMap.put(uid, shareMap.get(uid) + 1);
             }
         }
+        long creatorShare = shareMap.get(creator.getId());     // 생성자 최종 분담금
+        long roundedPerPerson = roundUpTo100(creatorShare);
 
         // 더치페이 저장
         Dutchpay d = new Dutchpay();
@@ -100,6 +103,7 @@ public class DutchpayServiceImpl implements DutchpayService {
         d.setTotalAmount(req.totalAmount());
         d.setPayMore(req.payMore());
         d.setCreator(creator);
+        d.setRoundedPerPerson(roundedPerPerson);
         d = dutchpayRepo.save(d);
 
         // 지분 저장 (생성자는 PAID, 나머지는 PENDING)
@@ -141,49 +145,64 @@ public class DutchpayServiceImpl implements DutchpayService {
     /* ================== DETAIL ================== */
     @Override
     @Transactional(readOnly = true)
-    public DutchpayDetailResponse  getDetail(Long dutchpayId, Long userId) {
-        // 1) 헤더 로드
+    public DutchpayDetailResponse getDetail(Long dutchpayId, Long requestUserId) {
+        // 1) 헤더
         var h = queryRepo.findDetailHeader(dutchpayId);
         if (h == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "더치페이를 찾을 수 없습니다.");
         }
 
-        // 2) 참여자 목록 로드
+        // 2) 참여자 목록
         var rows = queryRepo.findDetailShares(dutchpayId);
         if (rows == null || rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "참여자 정보가 없습니다.");
         }
 
-        // 3) 권한 체크: 생성자이거나, shares에 내가 포함되어 있어야 함
-        boolean isCreator = h.getCreatorId() != null && h.getCreatorId().equals(userId);
-        boolean isParticipant = rows.stream().anyMatch(r -> r.getUserId().equals(userId));
+        // 3) 권한 체크: 생성자 또는 참여자여야 함
+        boolean isCreator = Objects.equals(h.getCreatorId(), requestUserId);
+        boolean isParticipant = rows.stream().anyMatch(r -> Objects.equals(r.getUserId(), requestUserId));
         if (!isCreator && !isParticipant) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "해당 더치페이에 접근 권한이 없습니다.");
         }
 
-        // 4) 매핑
-        var shares = rows.stream()
-                .map(r -> new com.example.tiggle.dto.dutchpay.response.DutchpayDetailResponse.Share(
-                        r.getUserId(),
-                        r.getUserName(),
-                        r.getAmount(),
-                        r.getStatus()
-                ))
-                .toList();
+        // 4) roundedPerPerson 계산 (헤더값이 null이면 요청자 기준으로 보정)
+        Long roundedPerPerson = h.getRoundedPerPerson();
+        if (roundedPerPerson == null) {
+            long myAmount = rows.stream()
+                    .filter(r -> Objects.equals(r.getUserId(), requestUserId))
+                    .map(DutchpayShareBriefProjection::getAmount)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(0L);
+            roundedPerPerson = roundUpTo100(myAmount);
+        }
 
+        // 5) shares 매핑 + tiggleAmount 계산
+        var shares = rows.stream().map(r -> {
+            long amount = nvl(r.getAmount());
+            long tiggle = "PAID".equalsIgnoreCase(r.getStatus())
+                    ? Math.max(0, roundUpTo100(amount) - amount)
+                    : 0L;
+            return new DutchpayDetailResponse.Share(
+                    r.getUserId(),
+                    r.getName(),           // ← projection에 맞춰 name 사용
+                    amount,
+                    r.getStatus(),
+                    tiggle                  // 안 낸 사람은 0
+            );
+        }).toList();
+
+        // 6) 응답 조립 (payMore 제거 + requestUserId 포함)
         return new DutchpayDetailResponse(
                 h.getDutchpayId(),
+                requestUserId, // 지금 요청 보낸 유저 아이디
                 h.getTitle(),
                 h.getMessage(),
                 h.getTotalAmount(),
                 h.getStatus(),
-                new com.example.tiggle.dto.dutchpay.response.DutchpayDetailResponse.Creator(
-                        h.getCreatorId(),
-                        h.getCreatorName()
-                ),
+                new DutchpayDetailResponse.Creator(h.getCreatorId(), h.getCreatorName()),
                 shares,
-                h.getRoundedPerPerson(),
-                h.getPayMore(),
+                roundedPerPerson,
                 h.getCreatedAt()
         );
     }
