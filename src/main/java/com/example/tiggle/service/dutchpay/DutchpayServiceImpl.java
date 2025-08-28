@@ -189,18 +189,23 @@ public class DutchpayServiceImpl implements DutchpayService {
             nextCursor = toCursor(last.getRequestedAt(), last.getDutchpayId());
         }
 
-        var items = rows.stream().map(r ->
-                DutchpayListItemResponse.builder()
-                        .dutchpayId(r.getDutchpayId())
-                        .title(r.getTitle())
-                        .myAmount(nvl(r.getMyAmount()))
-                        .totalAmount(nvl(r.getTotalAmount()))
-                        .participantCount(nvlI(r.getParticipantCount()))
-                        .paidCount(nvlI(r.getPaidCount()))
-                        .requestedAt(r.getRequestedAt())
-                        .isCreator(nvlI(r.getIsCreator()) == 1)
-                        .build()
-        ).toList();
+        var items = rows.stream().map(r -> {
+            long myAmt = nvl(r.getMyAmount());                // 내 분담금(원금)
+            long tiggle = (myAmt > 0) ? (roundUpTo100(myAmt) - myAmt) : 0L;
+
+            return DutchpayListItemResponse.builder()
+                    .dutchpayId(r.getDutchpayId())
+                    .title(r.getTitle())
+                    .myAmount(myAmt)
+                    .totalAmount(nvl(r.getTotalAmount()))
+                    .participantCount(nvlI(r.getParticipantCount()))
+                    .paidCount(nvlI(r.getPaidCount()))
+                    .requestedAt(r.getRequestedAt())
+                    .isCreator(nvlI(r.getIsCreator()) == 1)
+                    .creatorName(r.getCreatorName())
+                    .tiggleAmount(tiggle)
+                    .build();
+        }).toList();
 
         return DutchpayListResponse.builder()
                 .items(items)

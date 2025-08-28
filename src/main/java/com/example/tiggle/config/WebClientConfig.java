@@ -56,7 +56,7 @@ public class WebClientConfig {
                 .baseUrl(openAiBaseUrl)
                 .defaultHeader("Authorization", "Bearer " + openAiApiKey)
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(1024 * 1024))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024)) // 10MB로 증가
                 .build();
     }
 }

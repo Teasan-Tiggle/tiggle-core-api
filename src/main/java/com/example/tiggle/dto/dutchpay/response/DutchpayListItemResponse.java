@@ -15,5 +15,7 @@ public record DutchpayListItemResponse(
         int paidCount,
         @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         LocalDateTime requestedAt,
-        boolean isCreator
+        boolean isCreator,
+        String creatorName,
+        long tiggleAmount
 ) {}
