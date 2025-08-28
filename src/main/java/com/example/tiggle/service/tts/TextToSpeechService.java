@@ -1,6 +1,8 @@
 package com.example.tiggle.service.tts;
 
+import java.util.List;
+
 public interface TextToSpeechService {
 
-    byte[] synthesizeSpeechKorean(String text);
+    List<byte[]> synthesizeSpeechKoreanBySentences(String script);
 }
