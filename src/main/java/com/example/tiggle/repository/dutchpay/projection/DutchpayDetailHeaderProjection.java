@@ -9,7 +9,6 @@ public interface DutchpayDetailHeaderProjection {
     Long getTotalAmount();
     String getStatus();
     Long getRoundedPerPerson();
-    Boolean getPayMore();
     LocalDateTime getCreatedAt();
     Long getCreatorId();
     String getCreatorName();
