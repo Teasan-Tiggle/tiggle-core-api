@@ -69,6 +69,9 @@ dependencies {
 
     // Google Cloud Text-to-Speech
     implementation 'com.google.cloud:google-cloud-texttospeech:2.40.0'
+
+    // Google Cloud Vertex AI (Imagen)
+    implementation 'com.google.cloud:google-cloud-aiplatform:3.54.0'
 }
 
 tasks.named('test') {

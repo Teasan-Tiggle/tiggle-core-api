@@ -1,6 +1,5 @@
-package com.example.tiggle.exception;
+package com.example.tiggle.exception.donation;
 
-import com.example.tiggle.exception.auth.AuthException;
 import lombok.Getter;
 
 @Getter
@@ -30,8 +29,16 @@ public class DonationException extends RuntimeException {
         return new DonationException("USER_ACCOUNT_NOT_FOUND", "사용자의 주계좌 정보가 없습니다.");
     }
 
+    public static DonationException organizationAccountNotFound() {
+        return new DonationException("ORGANIZATION_ACCOUNT_NOT_FOUND", "기부 단체의 계좌 정보가 없습니다.");
+    }
+
     public static DonationException accountBalance(Long balance) {
         return new DonationException("ACCOUNT_BALANCE_LACK", "계좌 잔고가 부족합니다. 잔액: " + balance);
+    }
+
+    public static DonationException donationBalance(Long balance) {
+        return new DonationException("DONATION_BALANCE_LACK", "기부 금액이 부족합니다. 모금액: " + balance);
     }
 
     public static DonationException externalApiFailure() {
