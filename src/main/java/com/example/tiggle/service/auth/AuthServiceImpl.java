@@ -63,9 +63,9 @@ public class AuthServiceImpl implements AuthService {
         Department department = departmentRepository.findById(requestDto.getDepartmentId())
                 .orElseThrow(() -> AuthException.departmentNotFound(requestDto.getDepartmentId()));
 
-        // 3. 금융 API 서버 중복 체크 및 userKey 획득 또는 생성
+        // 3. 금융 API 서버 중복 체크
         try {
-            UserResponse externalUserResponse = financialApiService.searchUser(requestDto.getEmail()).block();
+            financialApiService.searchUser(requestDto.getEmail()).block();
             logger.warn("금융 API 내 사용자 계정 존재: {}", requestDto.getEmail());
             throw AuthException.duplicateEmail();
         } catch (WebClientResponseException.NotFound | WebClientResponseException.BadRequest ex) {
@@ -74,11 +74,13 @@ public class AuthServiceImpl implements AuthService {
             throw AuthException.externalApiFailure("외부 API 사용자 조회 중 오류가 발생했습니다.", e);
         }
 
+        String encryptedUserKey;
         try {
             UserResponse createdUser = financialApiService.createUser(requestDto.getEmail()).block();
-            if (createdUser == null || createdUser.getUserKey() == null) {
+            if (createdUser == null || createdUser.getUserKey() == null || createdUser.getUserKey().isBlank()) {
                 throw AuthException.externalApiUserCreationFailure("금융 API 사용자 계정 생성 중 오류가 발생했습니다.", null);
             }
+            encryptedUserKey = encryptionService.encrypt(createdUser.getUserKey());
         } catch (Exception e) {
             throw AuthException.externalApiUserCreationFailure("금융 API 사용자 계정 생성 중 오류가 발생했습니다.", e);
         }
@@ -86,15 +88,17 @@ public class AuthServiceImpl implements AuthService {
         // 4. 비밀번호 해싱
         String encodedPassword = passwordEncoder.encode(requestDto.getPassword());
 
-        // 5. Student 엔티티 생성
-        Users user = new Users();
-        user.setEmail(requestDto.getEmail());
-        user.setPassword(encodedPassword);
-        user.setName(requestDto.getName());
-        user.setUniversity(university);
-        user.setDepartment(department);
-        user.setStudentId(requestDto.getStudentId());
-        user.setPhone(requestDto.getPhone());
+        // 5. User 엔티티 생성
+        Users user = Users.builder()
+                .email(requestDto.getEmail())
+                .password(encodedPassword)
+                .name(requestDto.getName())
+                .university(university)
+                .department(department)
+                .studentId(requestDto.getStudentId())
+                .phone(requestDto.getPhone())
+                .userKey(encryptedUserKey)
+                .build();
 
         // 6. DB에 저장
         try {
