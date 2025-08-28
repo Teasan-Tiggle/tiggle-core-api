@@ -101,7 +101,3 @@ google:
     text-to-speech:
       project-id: ${GOOGLE_TTS_PROJECT_ID}
       credentials: ${GOOGLE_TTS_CREDENTIALS}
-    vertex-ai:
-      project-id: ${GOOGLE_TTS_PROJECT_ID}
-      location: us-central1
-      credentials: ${GOOGLE_TTS_CREDENTIALS}
