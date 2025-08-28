@@ -25,7 +25,6 @@ public interface AuthService {
     /**
      * 회원가입한다.
      *
-     * @return 회원가입 성공 여부
      */
     void joinUser(JoinRequestDto requestDto);
 
