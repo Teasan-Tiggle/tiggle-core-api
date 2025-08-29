@@ -101,8 +101,7 @@ google:
     text-to-speech:
       project-id: ${GOOGLE_PROJECT_ID}
       credentials: ${GOOGLE_CREDENTIALS}
-  # Google Veo 3 Video Generation 설정
-  genai:
-    project-id: ${GOOGLE_PROJECT_ID}
-    location: ${GOOGLE_GENAI_LOCATION:us-central1}
-    credentials: ${GOOGLE_CREDENTIALS}
+  # Gemini API 설정
+  gemini:
+    api-key: ${GEMINI_API_KEY}
+    base-url: ${GEMINI_API_BASE_URL}
