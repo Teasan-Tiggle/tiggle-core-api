@@ -66,6 +66,12 @@ dependencies {
 
     // Jsoup for HTML parsing
     implementation 'org.jsoup:jsoup:1.17.2'
+
+    // JAVE2
+    implementation 'ws.schild:jave-all-deps:3.5.0'
+    
+    // FFmpeg CLI Wrapper
+    implementation 'net.bramp.ffmpeg:ffmpeg:0.8.0'
 }
 
 tasks.named('test') {
