@@ -21,10 +21,10 @@ public class WebClientConfig {
     @Value("${external-api.openai.api-key}")
     private String openAiApiKey;
 
-    @Value("${google.gemini.base-url}")
+    @Value("${external-api.gemini.base-url}")
     private String geminiBaseUrl;
 
-    @Value("${google.gemini.api-key}")
+    @Value("${external-api.gemini.api-key}")
     private String geminiApiKey;
 
     @Bean

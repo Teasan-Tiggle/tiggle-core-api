@@ -73,6 +73,9 @@ external-api:
     base-url: ${OPENAI_API_BASE_URL}
     api-key: ${OPENAI_API_KEY}
     model: ${OPENAI_API_MODEL}
+  gemini:
+    api-key: ${GEMINI_API_KEY}
+    base-url: ${GEMINI_API_BASE_URL}
 
 # Management 설정
 management:
@@ -94,14 +97,3 @@ jwt:
 # Firebase 설정
 firebase:
   credentials: ${FIREBASE_CREDENTIALS}
-
-# Google TTS 설정
-google:
-  cloud:
-    text-to-speech:
-      project-id: ${GOOGLE_PROJECT_ID}
-      credentials: ${GOOGLE_CREDENTIALS}
-  # Gemini API 설정
-  gemini:
-    api-key: ${GEMINI_API_KEY}
-    base-url: ${GEMINI_API_BASE_URL}
