@@ -1,6 +1,7 @@
 package com.ssafy.tiggle.service.shortform.script;
 
 import com.ssafy.tiggle.dto.common.ApiResponse;
+import com.ssafy.tiggle.dto.shortform.script.VideoSectionDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +12,10 @@ import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class ScriptGenerationServiceImpl implements ScriptGenerationService {
@@ -26,14 +31,16 @@ public class ScriptGenerationServiceImpl implements ScriptGenerationService {
     }
 
     @Override
-    public Mono<ApiResponse<String>> generateShortFormVideoScript(String title, String body) {
+    public Mono<ApiResponse<List<VideoSectionDto>>> generateShortFormVideoScript(String title, String body) {
         logger.info("숏폼 영상 스크립트 생성 시작 - title: {}", title);
 
         String prompt = createShortFormVideoPrompt(title, body);
         return generateResponse(prompt)
                 .map(script -> {
                     logger.info("숏폼 영상 스크립트 생성 완료 - length: {}", script.length());
-                    return ApiResponse.success(script);
+                    List<VideoSectionDto> sections = parseScriptToSections(script);
+                    logger.info("스크립트 파싱 완료 - {} 섹션", sections.size());
+                    return ApiResponse.success(sections);
                 })
                 .onErrorResume(error -> {
                     logger.error("숏폼 영상 스크립트 생성 실패", error);
@@ -195,4 +202,26 @@ public class ScriptGenerationServiceImpl implements ScriptGenerationService {
             OpenAiMessage message,
             String finish_reason
     ) {}
+
+    private List<VideoSectionDto> parseScriptToSections(String script) {
+        List<VideoSectionDto> sections = new ArrayList<>();
+        
+        // "섹션 X:" 패턴으로 스크립트를 분리
+        Pattern sectionPattern = Pattern.compile("섹션\\s*(\\d+)\\s*:\\s*(.+?)(?=섹션\\s*\\d+\\s*:|$)", Pattern.DOTALL);
+        Matcher matcher = sectionPattern.matcher(script);
+        
+        while (matcher.find()) {
+            int sectionNumber = Integer.parseInt(matcher.group(1));
+            String sectionScript = matcher.group(2).trim();
+            sections.add(new VideoSectionDto(sectionNumber, sectionScript));
+        }
+        
+        // 섹션이 파싱되지 않은 경우 전체 스크립트를 하나의 섹션으로 처리
+        if (sections.isEmpty()) {
+            logger.warn("섹션 파싱 실패 - 전체 스크립트를 섹션 1로 처리");
+            sections.add(new VideoSectionDto(1, script.trim()));
+        }
+        
+        return sections;
+    }
 }
