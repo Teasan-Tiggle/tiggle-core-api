@@ -358,30 +358,43 @@ public class AccountServiceImpl implements AccountService {
 
         return Mono.fromCallable(() -> {
                     String userKey = encryptionService.decrypt(encryptedUserKey);
-                    return getLinkedAccounts(userKey, userId);
+                    LinkedAccounts link = getLinkedAccounts(userKey, userId);
+
+                    // ✅ 더치페이 제목 조회 (메모로 사용)
+                    String memoTitle = dutchpayRepo.findById(dutchpayId)
+                            .map(Dutchpay::getTitle)
+                            .filter(t -> t != null && !t.isBlank())
+                            .orElse("더치페이");
+
+                    return new Object[]{link, memoTitle};
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(link ->
-                        financialApiService.updateDemandDepositAccountTransfer(
-                                        link.userKey(),
-                                        link.piggyAccountNo(),
-                                        "[DUTCH][PM][UID:" + userId + "] DP" + dutchpayId,
-                                        String.valueOf(tiggleAmount),
-                                        link.primaryAccountNo(),
-                                        "더치페이 잔액 반올림 저축 (DP" + dutchpayId + ")"
-                                )
-                                .timeout(Duration.ofSeconds(5))
-                                .map(resp -> {
-                                    boolean ok = resp.getHeader() != null && "H0000".equals(resp.getHeader().getResponseCode());
-                                    log.info("[DUTCH][PM] transfer result ok={}, userId={}, dpId={}, amount={}",
-                                            ok, userId, dutchpayId, tiggleAmount);
-                                    if (!ok) {
-                                        String msg = resp.getHeader() == null ? "응답 헤더 없음" : resp.getHeader().getResponseMessage();
-                                        throw new IllegalStateException("이체 실패: " + msg);
-                                    }
-                                    return resp;
-                                })
-                )
+                .flatMap(arr -> {
+                    LinkedAccounts link = (LinkedAccounts) arr[0];
+                    String memoTitle = (String) arr[1];
+
+                    return financialApiService.updateDemandDepositAccountTransfer(
+                                    link.userKey(),
+                                    link.piggyAccountNo(),
+                                    // summary는 기존 태그 유지 (멱등/추적용)
+                                    "[DUTCH][PM][UID:" + userId + "] DP" + dutchpayId,
+                                    String.valueOf(tiggleAmount),
+                                    link.primaryAccountNo(),
+                                    // ✅ 메모를 더치페이 title로
+                                    memoTitle
+                            )
+                            .timeout(Duration.ofSeconds(5))
+                            .map(resp -> {
+                                boolean ok = resp.getHeader() != null && "H0000".equals(resp.getHeader().getResponseCode());
+                                log.info("[DUTCH][PM] transfer result ok={}, userId={}, dpId={}, amount={}",
+                                        ok, userId, dutchpayId, tiggleAmount);
+                                if (!ok) {
+                                    String msg = resp.getHeader() == null ? "응답 헤더 없음" : resp.getHeader().getResponseMessage();
+                                    throw new IllegalStateException("이체 실패: " + msg);
+                                }
+                                return resp;
+                            });
+                })
                 .flatMap(resp ->
                         Mono.fromCallable(() -> {
                             piggyBankWriterService.applyTiggle(userId, BigDecimal.valueOf(tiggleAmount));
@@ -399,6 +412,7 @@ public class AccountServiceImpl implements AccountService {
                     return Mono.error(e);
                 });
     }
+
 
 
     private LinkedAccounts getLinkedAccounts(String userKey, Long userId) {
