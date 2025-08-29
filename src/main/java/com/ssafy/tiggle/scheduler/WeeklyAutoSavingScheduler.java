@@ -178,11 +178,15 @@ public class WeeklyAutoSavingScheduler {
                                 }
 
                                 // 4) 저금통 반영 (쓰기 작업은 별도 스레드에서)
-                                return Mono.fromCallable(() -> {
-                                            piggyBankWriterService.applyTiggle(owner.getId(), BigDecimal.valueOf(amount));
-                                            return true;
-                                        })
+                                return Mono.fromCallable(() ->
+                                                piggyBankWriterService.applyTiggle(owner.getId(), BigDecimal.valueOf(amount))
+                                        )
                                         .subscribeOn(Schedulers.boundedElastic())
+                                        .doOnNext(readyNow -> {
+                                            if (readyNow) {
+                                                log.info("[WeeklyAutoSaving] userId={} 목표금액 달성(donation_ready=ON)", owner.getId());
+                                            }
+                                        })
                                         .then();
                             });
                 });

@@ -1,7 +1,6 @@
 package com.ssafy.tiggle.scheduler;
 
-import com.ssafy.tiggle.dto.finopenapi.response.InquireTransactionHistoryListREC;
-import com.ssafy.tiggle.entity.EsgCategory; // 엔티티
+import com.ssafy.tiggle.entity.EsgCategory;
 import com.ssafy.tiggle.entity.PiggyBank;
 import com.ssafy.tiggle.entity.University;
 import com.ssafy.tiggle.entity.Users;
@@ -36,31 +35,28 @@ public class WeeklyUniversityDonationScheduler {
     private final FinancialApiService financialApiService;
     private final EncryptionService encryptionService;
 
-    private static final long   SETTLEMENT_USER_ID    = 1L;              // 정산 유저 ID (원하면 이메일 사용)
-    private static final String SETTLEMENT_USER_EMAIL = "";              // "service@tiggle.com" 등 (비워두면 ID 사용)
+    private static final long   SETTLEMENT_USER_ID    = 1L;
+    private static final String SETTLEMENT_USER_EMAIL = "";
     private static final String LOG_DIR =
             Paths.get(System.getProperty("user.dir"), "donation-logs").toString();
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter YMD = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter WEEK_TAG_FMT = DateTimeFormatter.BASIC_ISO_DATE; // yyyyMMdd(월요일 기준)
+    private static final DateTimeFormatter WEEK_TAG_FMT = DateTimeFormatter.BASIC_ISO_DATE;
 
     // 매주 일요일 19:00 KST
-    @Scheduled(cron = "0 41 0 ? * SAT", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 56 6 ? * SAT", zone = "Asia/Seoul")
     @Transactional
     public void runWeeklyUniversityDonation() {
         log.info("[WeeklyUniversityDonation] START (KST now={})", ZonedDateTime.now(KST));
 
-        // 0) 정산 유저(users) 조회 → 계좌/키 확보
+        // 0) 정산 유저 조회
         Users settlementUser = resolveSettlementUser();
-        if (settlementUser == null) {
-            log.warn("[WeeklyUniversityDonation] cannot resolve settlement user — abort");
-            return;
-        }
-        if (isBlank(settlementUser.getPrimaryAccountNo()) || isBlank(settlementUser.getUserKey())) {
-            log.warn("[WeeklyUniversityDonation] settlement user missing primary_account_no or user_key — abort (userId={})",
-                    settlementUser.getId());
+        if (settlementUser == null
+                || isBlank(settlementUser.getPrimaryAccountNo())
+                || isBlank(settlementUser.getUserKey())) {
+            log.warn("[WeeklyUniversityDonation] settlement user resolve failed — abort");
             return;
         }
         final String settlementAccountNo = settlementUser.getPrimaryAccountNo();
@@ -68,29 +64,18 @@ public class WeeklyUniversityDonationScheduler {
         try {
             settlementUserKey = encryptionService.decrypt(settlementUser.getUserKey());
         } catch (Exception e) {
-            log.warn("[WeeklyUniversityDonation] decrypt settlement userKey failed — abort. msg={}", e.getMessage(), e);
+            log.warn("[WeeklyUniversityDonation] decrypt settlement key failed: {}", e.getMessage());
             return;
         }
 
-        // 1) 이번 주 월~일 & 태그
+        // 1) 이번 주 범위 & 태그(로그/메모용)
         LocalDate today = LocalDate.now(KST);
         LocalDate weekMon = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate weekSun = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
         final String weekTag = "[W:" + weekMon.format(WEEK_TAG_FMT) + "]";
 
-        // 2) 대상: autoDonation=true && current >= target
-        List<PiggyBank> targets = piggyBankRepository.findAllByAutoDonationTrue().stream()
-                .filter(p -> {
-                    Users u = p.getOwner();
-                    if (u == null || u.getUniversity() == null) return false;
-                    if (p.getEsgCategory() == null) return false; // 엔티티
-                    if (isBlank(p.getAccountNo())) return false;
-                    BigDecimal cur = nvl(p.getCurrentAmount());
-                    BigDecimal tgt = nvl(p.getTargetAmount());
-                    return tgt.compareTo(BigDecimal.ZERO) > 0 && cur.compareTo(tgt) >= 0;
-                })
-                .collect(Collectors.toList());
-
+        // 2) 후보 조회: donation_ready=true + auto_donation=true + current>=target
+        List<PiggyBank> targets = piggyBankRepository.findAllReadyToDonate();
         if (targets.isEmpty()) {
             log.info("[WeeklyUniversityDonation] no targets — END");
             return;
@@ -102,8 +87,12 @@ public class WeeklyUniversityDonationScheduler {
 
         // 4) 로그 디렉터리 준비
         Path dir = Paths.get(LOG_DIR);
-        try { Files.createDirectories(dir); }
-        catch (IOException e) { log.warn("[WeeklyUniversityDonation] cannot create log dir {}: {}", LOG_DIR, e.getMessage(), e); return; }
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            log.warn("[WeeklyUniversityDonation] cannot create log dir {}: {}", LOG_DIR, e.getMessage());
+            return;
+        }
 
         // 5) 대학별 처리
         for (Map.Entry<Long, List<PiggyBank>> entry : byUniv.entrySet()) {
@@ -122,96 +111,105 @@ public class WeeklyUniversityDonationScheduler {
             themeSum.put(2, BigDecimal.ZERO);
             themeSum.put(3, BigDecimal.ZERO);
 
-            String tsPrefix = LocalDateTime.now(KST).format(TS) + "] ";
+            String tsPrefix = "[" + LocalDateTime.now(KST).format(TS) + "] ";
 
             try (BufferedWriter bw = Files.newBufferedWriter(file)) {
-                // 헤더
-                bw.write(tsPrefix + univName + " 학교 계좌로 학생들 티끌 저금통 수금 시작");
+                bw.write(tsPrefix + univName + " 학교 계좌로 학생들 티끌 저금통 모금 시작");
                 bw.newLine();
 
-                // 5-1) 유저별 출금 → 파일 기록 → 합산
+                // 5-1) 유저별 출금
                 for (PiggyBank p : list) {
                     Users u = p.getOwner();
                     String userName = Optional.ofNullable(u.getName()).orElse("UnknownUser");
                     String piggyAcc = Optional.ofNullable(p.getAccountNo()).orElse("N/A");
-                    int catId = themeId(p.getEsgCategory()); // 1/2/3 (EsgCategory.name 기반)
+                    int catId = themeId(p.getEsgCategory());
                     String theme = themeName(catId) + "테마";
                     BigDecimal amount = nvl(p.getTargetAmount());
 
-                    // 사용자 userKey 복호화
+                    // (A) 선점(락): donation_ready=1 -> 0 으로 바꿔서 내가 처리권 확보
+                    int slot = usersRepository.acquireDonationSlot(u.getId());
+                    if (slot == 0) {
+                        // 이미 다른 워커/서버가 처리 중이거나 방금 처리 완료됨
+                        bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 선점 실패 — 스킵");
+                        bw.newLine();
+                        continue;
+                    }
+
+                    // (B) 안전 가드: 실제 잔액이 target보다 작아졌다면 스킵
+                    if (nvl(p.getCurrentAmount()).compareTo(amount) < 0) {
+                        bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc +
+                                " 현재 잔액 부족 — 스킵(current=" +
+                                nvl(p.getCurrentAmount()).stripTrailingZeros().toPlainString() +
+                                ", target=" + amount.stripTrailingZeros().toPlainString() + ")");
+                        bw.newLine();
+                        // 선점으로 donation_ready는 이미 0이므로 추가 조치 불필요
+                        continue;
+                    }
+
+                    // (C) userKey 복호화
                     final String userKey;
                     try {
                         if (isBlank(u.getUserKey())) {
                             bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 출금 스킵(사유:userKey 없음)");
                             bw.newLine();
+                            // 실패이긴 하지만 조건이 아직 충족이면 다시 ready로(선택: 여기선 굳이 안 올림)
                             continue;
                         }
                         userKey = encryptionService.decrypt(u.getUserKey());
                     } catch (Exception e) {
                         bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 출금 스킵(사유:복호화 실패)");
                         bw.newLine();
+                        // 복구: 조건 유지 시 다시 ready=1
+                        usersRepository.markDonationReadyIfReached(u.getId());
                         continue;
                     }
 
-                    // 이번 주 중복 출금 방지(저금통 계좌 거래내역 확인)
-                    boolean already = false;
-                    try {
-                        var res = financialApiService
-                                .inquireTransactionHistoryList(userKey, piggyAcc, weekMon.format(YMD), weekSun.format(YMD), "A", "ASC")
-                                .block();
-                        already = res != null && res.getRec() != null && res.getRec().getList() != null
-                                && res.getRec().getList().stream().anyMatch(r -> isThisWeekDonationWithdrawalTx(r, u.getId(), weekTag));
-                    } catch (Exception e) {
-                        log.warn("[WeeklyUniversityDonation] history inquire failed userId={} acc={} msg={}", u.getId(), piggyAcc, e.getMessage());
-                    }
-                    already = false;
-                    if (already) {
-                        bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 이번 주 이미 출금됨 — 스킵");
-                        bw.newLine();
-                        continue;
-                    }
-
-                    // 출금 요약(태그)
+                    // (D) 출금 수행 (저금통 계좌에서 target만큼)
                     String summary = "[TIGGLE][DONATION][WD][UID:" + u.getId() + "]" + weekTag + " 주간 자동 기부 출금";
-
-                    // 실제 출금 (저금통 계좌에서 목표 금액만큼)
                     try {
                         var wdResp = financialApiService
-                                .updateDemandDepositAccountWithdrawal(userKey, piggyAcc, amount.stripTrailingZeros().toPlainString(), summary)
+                                .updateDemandDepositAccountWithdrawal(userKey, piggyAcc,
+                                        amount.stripTrailingZeros().toPlainString(), summary)
                                 .block();
 
-                        boolean ok = wdResp != null && wdResp.getHeader() != null && "H0000".equals(wdResp.getHeader().getResponseCode());
+                        boolean ok = wdResp != null && wdResp.getHeader() != null
+                                && "H0000".equals(wdResp.getHeader().getResponseCode());
                         if (!ok) {
-                            String msg = (wdResp == null || wdResp.getHeader() == null) ? "no response/header" : wdResp.getHeader().getResponseMessage();
+                            String msg = (wdResp == null || wdResp.getHeader() == null)
+                                    ? "no response/header" : wdResp.getHeader().getResponseMessage();
                             bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 출금 실패: " + msg);
                             bw.newLine();
+                            // 복구: 조건 유지 시 다시 ready=1
+                            usersRepository.markDonationReadyIfReached(u.getId());
                             continue;
                         }
 
-                        // ✅ 출금 성공 시 파일 기록
-                        bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + "에서 " + amount.stripTrailingZeros().toPlainString() + " 출금");
+                        // (E) 파일 기록
+                        bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc +
+                                "에서 " + amount.stripTrailingZeros().toPlainString() + "원" + " 출금");
                         bw.newLine();
 
-                        // ✅ DB 원자적 반영 (current_amount 차감, 카운트/합계 증가)
+                        // (F) DB 반영(원자적 차감/카운트/합계 증가)
                         int updated = piggyBankRepository.applyDonation(p.getId(), amount);
                         if (updated == 0) {
-                            // 경합/상태변경으로 WHERE 조건 불충족 → 중복 차감 방지
+                            // 경합 등으로 실패 → 합산 제외하고 플래그 복구
                             log.warn("[WeeklyUniversityDonation] DB applyDonation skipped (piggyId={}, amount={})", p.getId(), amount);
-                            // 파일에도 흔적 남기고 싶다면 한 줄 기록해도 됨(선택)
-                            // bw.write(tsPrefix + "(주의) DB 반영 스킵: piggyId=" + p.getId() + ", amount=" + amount.stripTrailingZeros().toPlainString());
-                            // bw.newLine();
+                            usersRepository.markDonationReadyIfReached(u.getId());
+                            continue;
                         }
 
-                        // 합산
+                        // (G) 성공: 합산 (플래그는 선점에서 이미 0이라 추가 조치 없음)
                         themeSum.compute(catId, (k, v) -> (v == null ? amount : v.add(amount)));
 
                     } catch (Exception e) {
                         bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 출금 예외: " + e.getMessage());
                         bw.newLine();
+                        // 복구: 조건 유지 시 다시 ready=1
+                        usersRepository.markDonationReadyIfReached(u.getId());
                     }
                 }
 
-                // 5-2) 합계 송금(정산계좌 → 대학 테마계좌, 각 테마 1회)
+                // 5-2) 대학×테마 합산 송금
                 for (Map.Entry<Integer, BigDecimal> tsEntry : themeSum.entrySet()) {
                     int catId = tsEntry.getKey();
                     BigDecimal sum = nvl(tsEntry.getValue());
@@ -219,33 +217,34 @@ public class WeeklyUniversityDonationScheduler {
 
                     String toAccount = resolveThemeAccount(univ, catId);
                     if (isBlank(toAccount)) {
-                        bw.write(tsPrefix + univName + " " + themeName(catId) + " 계좌 미설정 — 송금 생략 (합계 " + sum.stripTrailingZeros().toPlainString() + ")");
+                        bw.write(tsPrefix + univName + " " + themeName(catId) + " 계좌 미설정 — 송금 생략 (합계 " +
+                                sum.stripTrailingZeros().toPlainString() + ")");
                         bw.newLine();
                         continue;
                     }
 
-                    String summary = "[TIGGLE][DONATION][UNIV:" + univ.getId() + "][THEME:" + themeName(catId) + "]" + weekTag + " 주간 합산 송금";
-                    String memo = univName + " " + themeName(catId) + " 테마 주간 합산 송금(" + weekMon.format(YMD) + "~" + weekSun.format(YMD) + ")";
-
+                    String summary = "[TIGGLE][DONATION][UNIV:" + univ.getId() + "][THEME:" + themeName(catId) + "]"
+                            + weekTag + " 주간 합산 송금";
+                    String memo = univName + " " + themeName(catId) + " 테마 주간 합산 송금("
+                            + weekMon.format(YMD) + "~" + weekSun.format(YMD) + ")";
                     try {
-                        var trResp = financialApiService
-                                .updateDemandDepositAccountTransfer(
-                                        settlementUserKey,
-                                        toAccount,                                   // 입금: 대학 테마 계좌
-                                        summary,                                     // 입금요약(태그)
-                                        sum.stripTrailingZeros().toPlainString(),    // 금액
-                                        settlementAccountNo,                         // 출금: 정산계좌
-                                        memo                                         // 출금메모
-                                )
-                                .block();
+                        var trResp = financialApiService.updateDemandDepositAccountTransfer(
+                                settlementUserKey, toAccount, summary,
+                                sum.stripTrailingZeros().toPlainString(),
+                                settlementAccountNo, memo
+                        ).block();
 
-                        boolean ok = trResp != null && trResp.getHeader() != null && "H0000".equals(trResp.getHeader().getResponseCode());
+                        boolean ok = trResp != null && trResp.getHeader() != null
+                                && "H0000".equals(trResp.getHeader().getResponseCode());
                         if (ok) {
-                            bw.write(tsPrefix + univName + " " + themeName(catId) + " 계좌로 총 " + sum.stripTrailingZeros().toPlainString() + " 송금 완료");
+                            bw.write(tsPrefix + univName + " " + themeName(catId) + " 계좌로 총 "
+                                    + sum.stripTrailingZeros().toPlainString() + "원" + " 송금 완료");
                             bw.newLine();
                         } else {
-                            String msg = (trResp == null || trResp.getHeader() == null) ? "no response/header" : trResp.getHeader().getResponseMessage();
-                            bw.write(tsPrefix + univName + " " + themeName(catId) + " 계좌 송금 실패: " + msg + " (합계 " + sum.stripTrailingZeros().toPlainString() + ")");
+                            String msg = (trResp == null || trResp.getHeader() == null)
+                                    ? "no response/header" : trResp.getHeader().getResponseMessage();
+                            bw.write(tsPrefix + univName + " " + themeName(catId) + " 계좌 송금 실패: "
+                                    + msg + " (합계 " + sum.stripTrailingZeros().toPlainString() + ")");
                             bw.newLine();
                         }
                     } catch (Exception e) {
@@ -254,7 +253,7 @@ public class WeeklyUniversityDonationScheduler {
                     }
                 }
             } catch (IOException e) {
-                log.warn("[WeeklyUniversityDonation] write file failed {}: {}", file, e.getMessage(), e);
+                log.warn("[WeeklyUniversityDonation] write file failed {}: {}", file, e.getMessage());
             }
         }
 
@@ -264,9 +263,8 @@ public class WeeklyUniversityDonationScheduler {
     // ===== Helpers =====
 
     private Users resolveSettlementUser() {
-        if (!isBlank(SETTLEMENT_USER_EMAIL)) {
+        if (!isBlank(SETTLEMENT_USER_EMAIL))
             return usersRepository.findByEmail(SETTLEMENT_USER_EMAIL).orElse(null);
-        }
         return usersRepository.findById(SETTLEMENT_USER_ID).orElse(null);
     }
 
@@ -279,27 +277,14 @@ public class WeeklyUniversityDonationScheduler {
         return n;
     }
 
-    /** EsgCategory(엔티티) → 1/2/3 (name 기준 매핑) */
     private static int themeId(EsgCategory cat) {
         if (cat == null || cat.getName() == null) return 0;
         String n = cat.getName().trim().toLowerCase();
-        return switch (n) {
-            case "planet" -> 1;
-            case "people" -> 2;
-            case "prosperity" -> 3;
-            default -> 0;
-        };
+        return switch (n) { case "planet" -> 1; case "people" -> 2; case "prosperity" -> 3; default -> 0; };
     }
-
     private static String themeName(int id) {
-        return switch (id) {
-            case 1 -> "Planet";
-            case 2 -> "People";
-            case 3 -> "Prosperity";
-            default -> "Unknown";
-        };
+        return switch (id) { case 1 -> "Planet"; case 2 -> "People"; case 3 -> "Prosperity"; default -> "Unknown"; };
     }
-
     private static String resolveThemeAccount(University u, int themeId) {
         if (u == null) return null;
         return switch (themeId) {
@@ -308,20 +293,5 @@ public class WeeklyUniversityDonationScheduler {
             case 3 -> u.getProsperityAccountNo();
             default -> null;
         };
-    }
-
-    /** 이번 주 사용자 출금(기부 출금) 거래인지 판별 */
-    private static boolean isThisWeekDonationWithdrawalTx(InquireTransactionHistoryListREC r, Long userId, String weekTag) {
-        String t = Optional.ofNullable(r.getTransactionType()).orElse("");
-        String n = Optional.ofNullable(r.getTransactionTypeName()).orElse("");
-        boolean withdrawal = "W".equalsIgnoreCase(t) || "2".equals(t) || n.contains("출금");
-        if (!withdrawal) return false;
-        String s = Optional.ofNullable(r.getTransactionSummary()).orElse("");
-        String m = Optional.ofNullable(r.getTransactionMemo()).orElse("");
-        return (s.contains("[TIGGLE]") || m.contains("[TIGGLE]"))
-                && (s.contains("[DONATION]") || m.contains("[DONATION]"))
-                && (s.contains("[WD]") || m.contains("[WD]"))
-                && (s.contains("[UID:" + userId + "]") || m.contains("[UID:" + userId + "]"))
-                && (s.contains(weekTag) || m.contains(weekTag));
     }
 }

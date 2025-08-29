@@ -396,12 +396,18 @@ public class AccountServiceImpl implements AccountService {
                             });
                 })
                 .flatMap(resp ->
-                        Mono.fromCallable(() -> {
-                            piggyBankWriterService.applyTiggle(userId, BigDecimal.valueOf(tiggleAmount));
-                            return true;
-                        }).subscribeOn(Schedulers.boundedElastic())
+                        Mono.fromCallable(() ->
+                                        piggyBankWriterService.applyTiggle(userId, BigDecimal.valueOf(tiggleAmount)) // boolean
+                                )
+                                .subscribeOn(Schedulers.boundedElastic())
+                                .doOnNext(readyNow -> {
+                                    if (readyNow) {
+                                        log.info("[DUTCH][PM] userId={} 목표금액 달성(donation_ready=ON)", userId);
+                                        // 여기서 FCM 등 축하 알림도 가능
+                                    }
+                                })
+                                .then()
                 )
-                .then()
                 .onErrorResume(org.springframework.web.reactive.function.client.WebClientResponseException.class, e -> {
                     log.warn("더치페이 자투리 저축 실패 userId={}, dutchpayId={}, status={}, headers={}, body={}",
                             userId, dutchpayId, e.getStatusCode(), e.getHeaders(), e.getResponseBodyAsString(), e);
@@ -412,6 +418,7 @@ public class AccountServiceImpl implements AccountService {
                     return Mono.error(e);
                 });
     }
+
 
 
 
