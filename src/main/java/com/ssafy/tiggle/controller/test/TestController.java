@@ -2,8 +2,8 @@ package com.ssafy.tiggle.controller.test;
 
 import com.ssafy.tiggle.dto.common.ApiResponse;
 import com.ssafy.tiggle.dto.news.CategoryNewsResponseDto;
-import com.ssafy.tiggle.dto.video.VideoGenerationResponse;
-import com.ssafy.tiggle.service.image.ImageGenerationService;
+import com.ssafy.tiggle.dto.video.GeminiVideoGenerationDto;
+import com.ssafy.tiggle.dto.video.GeminiVideoStatusDto;
 import com.ssafy.tiggle.service.news.NewsCrawlerService;
 import com.ssafy.tiggle.service.openai.OpenAiService;
 import com.ssafy.tiggle.service.tts.TextToSpeechService;
@@ -17,6 +17,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -32,7 +33,6 @@ import java.util.zip.ZipOutputStream;
 public class TestController {
 
     private final TextToSpeechService textToSpeechService;
-    private final ImageGenerationService imageGenerationService;
     private final OpenAiService openAiService;
     private final NewsCrawlerService newsCrawlerService;
     private final VideoGenerationService videoGenerationService;
@@ -119,139 +119,83 @@ public class TestController {
         return baos.toByteArray();
     }
 
-    @GetMapping("/image")
-    @Operation(summary = "문장별 이미지 시리즈 생성 테스트", description = "주어진 스크립트를 문장별로 분리하여 각각 이미지를 생성한 후 ZIP 파일로 압축하여 반환합니다.")
-    public ResponseEntity<byte[]> testImageGeneration(
-            @Parameter(description = "문장별로 분리하여 이미지를 생성할 스크립트 (줄바꿈으로 구분)",
-                    example = "오픈AI가 서울에 지사를 연다고 해.\n다음 달 10일에 개소식을 한대.")
-            @RequestParam String script) {
-
-        log.info("문장별 이미지 생성 테스트 요청 - 스크립트 길이: {}", script.length());
-
-        try {
-            List<byte[]> imageFiles = imageGenerationService.generateImageSeriesByScript(script);
-
-            // ZIP 파일로 압축
-            byte[] zipContent = createImageZipFile(imageFiles);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.parseMediaType("application/zip"));
-            headers.setContentDispositionFormData("attachment", "image_series.zip");
-
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(zipContent);
-
-        } catch (Exception e) {
-            log.error("문장별 이미지 생성 중 오류 발생", e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    private byte[] createImageZipFile(List<byte[]> imageFiles) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
-            for (int i = 0; i < imageFiles.size(); i++) {
-                ZipEntry entry = new ZipEntry("image_" + (i + 1) + ".png");
-                zos.putNextEntry(entry);
-                zos.write(imageFiles.get(i));
-                zos.closeEntry();
-            }
-        }
-
-        log.info("이미지 ZIP 파일 생성 완료 - {} 개의 이미지 파일 포함", imageFiles.size());
-        return baos.toByteArray();
-    }
-
     @PostMapping("/video/generate")
-    @Operation(summary = "비디오 생성", description = "텍스트 프롬프트를 사용하여 비디오를 생성합니다 (16:9 비율, Fast 모델 고정)")
-    public ResponseEntity<VideoGenerationResponse> generateVideo(
+    @Operation(summary = "Gemini 비디오 생성", description = "텍스트 프롬프트를 사용하여 Gemini API로 비디오를 생성합니다")
+    public ResponseEntity<ApiResponse<GeminiVideoGenerationDto>> generateVideo(
             @Parameter(description = "비디오 생성을 위한 텍스트 프롬프트", example = "A serene sunset over a calm ocean with gentle waves")
             @RequestParam String prompt) {
         
-        log.info("비디오 생성 요청 - 프롬프트: {}", prompt);
+        log.info("Gemini 비디오 생성 요청 - 프롬프트: {}", prompt);
         
         try {
-            String operationId = videoGenerationService.generateVideo(prompt).block();
-            
-            VideoGenerationResponse response = VideoGenerationResponse.builder()
-                    .operationId(operationId)
-                    .status("PROCESSING")
-                    .estimatedCompletionTime(120) // 2 minutes estimate
-                    .build();
-            
+            ApiResponse<GeminiVideoGenerationDto> response = videoGenerationService.generateVideo(prompt).block();
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("비디오 생성 실패", e);
+            log.error("Gemini 비디오 생성 실패", e);
             return ResponseEntity.status(500)
-                    .body(VideoGenerationResponse.builder()
-                            .status("ERROR")
-                            .errorMessage("비디오 생성 중 오류가 발생했습니다")
-                            .build());
+                    .body(ApiResponse.failure("Gemini 비디오 생성 중 오류가 발생했습니다: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping(value = "/video/generate-with-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Gemini 이미지 기반 비디오 생성", description = "텍스트 프롬프트와 이미지를 사용하여 Gemini API로 비디오를 생성합니다")
+    public ResponseEntity<ApiResponse<GeminiVideoGenerationDto>> generateVideoWithImage(
+            @Parameter(description = "비디오 생성을 위한 텍스트 프롬프트", example = "Animate this image with gentle movement")
+            @RequestParam String textPrompt,
+            @Parameter(description = "애니메이션을 적용할 이미지 파일")
+            @RequestParam MultipartFile image) {
+        
+        log.info("Gemini 이미지 기반 비디오 생성 요청 - 프롬프트: {}, 이미지: {}", textPrompt, image.getOriginalFilename());
+        
+        try {
+            ApiResponse<GeminiVideoGenerationDto> response = videoGenerationService.generateVideoWithImage(textPrompt, image).block();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Gemini 이미지 기반 비디오 생성 실패", e);
+            return ResponseEntity.status(500)
+                    .body(ApiResponse.failure("Gemini 이미지 기반 비디오 생성 중 오류가 발생했습니다: " + e.getMessage()));
         }
     }
 
     @GetMapping("/video/status")
-    @Operation(summary = "비디오 생성 상태 확인", description = "작업 ID를 사용하여 비디오 생성 상태를 확인합니다")
-    public ResponseEntity<VideoGenerationResponse> getVideoStatus(
-            @Parameter(description = "작업 ID", example = "operations/generate_12345")
-            @RequestParam String operationId) {
+    @Operation(summary = "Gemini 비디오 생성 상태 확인", description = "Operation Name을 사용하여 Gemini 비디오 생성 상태를 확인합니다")
+    public ResponseEntity<ApiResponse<GeminiVideoStatusDto>> getVideoStatus(
+            @Parameter(description = "Operation Name", example = "models/veo-3.0-fast-generate-preview/operations/7xm0svrbukrn")
+            @RequestParam String operationName) {
         
-        log.info("Video status check requested for operation: {}", operationId);
+        log.info("Gemini 비디오 상태 확인 요청 - Operation Name: {}", operationName);
         
         try {
-            String status = videoGenerationService.getVideoStatus(operationId).block();
-            
-            VideoGenerationResponse response = VideoGenerationResponse.builder()
-                    .operationId(operationId)
-                    .status(status)
-                    .build();
-            
-            if ("COMPLETED".equals(status)) {
-                // 실제 비디오 URL 가져오기
-                try {
-                    String videoUrl = videoGenerationService.getVideoUrl(operationId).block();
-                    response.setVideoUrl(videoUrl);
-                } catch (Exception e) {
-                    log.warn("Failed to get video URL for completed operation: {}", operationId, e);
-                    // URL 가져오기 실패 시에도 COMPLETED 상태로 반환
-                }
-            }
-            
+            ApiResponse<GeminiVideoStatusDto> response = videoGenerationService.getVideoStatus(operationName).block();
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("Failed to get video status for operation: {}", operationId, e);
+            log.error("Gemini 비디오 상태 확인 실패 - Operation Name: {}", operationName, e);
             return ResponseEntity.status(500)
-                    .body(VideoGenerationResponse.builder()
-                            .operationId(operationId)
-                            .status("ERROR")
-                            .errorMessage("상태 확인 중 오류가 발생했습니다")
-                            .build());
+                    .body(ApiResponse.failure("Gemini 비디오 상태 확인 중 오류가 발생했습니다: " + e.getMessage()));
         }
     }
 
     @GetMapping("/video/download")
-    @Operation(summary = "비디오 다운로드", description = "생성된 비디오를 다운로드합니다")
+    @Operation(summary = "Gemini 비디오 다운로드", description = "Operation Name을 사용하여 생성된 비디오를 다운로드합니다")
     public ResponseEntity<byte[]> downloadVideo(
-            @Parameter(description = "비디오 URL")
-            @RequestParam String videoUrl) {
+            @Parameter(description = "Operation Name", example = "models/veo-3.0-fast-generate-preview/operations/7xm0svrbukrn")
+            @RequestParam String operationName) {
         
-        log.info("Video download requested for URL: {}", videoUrl);
+        log.info("Gemini 비디오 다운로드 요청 - Operation Name: {}", operationName);
         
         try {
-            byte[] videoBytes = videoGenerationService.downloadVideo(videoUrl).block();
+            byte[] videoBytes = videoGenerationService.downloadVideo(operationName).block();
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.valueOf("video/mp4"));
-            headers.setContentDispositionFormData("attachment", "generated_video.mp4");
+            headers.setContentDispositionFormData("attachment", "gemini_generated_video.mp4");
             headers.setContentLength(videoBytes.length);
             
             return ResponseEntity.ok()
                     .headers(headers)
                     .body(videoBytes);
         } catch (Exception e) {
-            log.error("Failed to download video from URL: {}", videoUrl, e);
+            log.error("Gemini 비디오 다운로드 실패 - Operation Name: {}", operationName, e);
             return ResponseEntity.notFound().build();
         }
     }
