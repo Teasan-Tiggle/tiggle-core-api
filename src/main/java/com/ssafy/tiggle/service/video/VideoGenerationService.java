@@ -1,15 +1,14 @@
 package com.ssafy.tiggle.service.video;
 
+import com.ssafy.tiggle.dto.common.ApiResponse;
+import com.ssafy.tiggle.dto.video.GeminiVideoGenerationDto;
+import com.ssafy.tiggle.dto.video.GeminiVideoStatusDto;
+import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Mono;
 
 public interface VideoGenerationService {
-    Mono<String> generateVideo(String textPrompt);
-    Mono<String> generateVideo(String textPrompt, String model);
-    Mono<String> generateVideo(String textPrompt, String model, Integer seed);
-    Mono<String> generateVideoSequence(String textPrompt, String previousVideoUrl);
-    Mono<String> generateVideoSequence(String textPrompt, String previousVideoUrl, String model);
-    Mono<String> generateVideoSequence(String textPrompt, String previousVideoUrl, String model, Integer seed);
-    Mono<String> getVideoStatus(String operationId);
-    Mono<String> getVideoUrl(String operationId);
-    Mono<byte[]> downloadVideo(String videoUrl);
+    Mono<ApiResponse<GeminiVideoGenerationDto>> generateVideo(String textPrompt);
+    Mono<ApiResponse<GeminiVideoGenerationDto>> generateVideoWithImage(String textPrompt, MultipartFile imageFile);
+    Mono<ApiResponse<GeminiVideoStatusDto>> getVideoStatus(String operationName);
+    Mono<byte[]> downloadVideo(String operationName);
 }
