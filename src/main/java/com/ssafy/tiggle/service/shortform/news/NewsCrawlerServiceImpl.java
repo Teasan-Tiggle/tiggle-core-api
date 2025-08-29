@@ -1,5 +1,6 @@
 package com.ssafy.tiggle.service.shortform.news;
 
+import com.ssafy.tiggle.dto.common.ApiResponse;
 import com.ssafy.tiggle.dto.shortform.news.CategoryNewsResponseDto;
 import com.ssafy.tiggle.dto.shortform.news.NewsArticleDto;
 import org.jsoup.Jsoup;
@@ -9,6 +10,7 @@ import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 import java.util.*;
 
@@ -28,25 +30,32 @@ public class NewsCrawlerServiceImpl implements NewsCrawlerService {
     );
 
     @Override
-    public List<CategoryNewsResponseDto> crawlAllCategoryHeadlines() throws Exception {
-        List<CategoryNewsResponseDto> allCategoryNews = new ArrayList<>();
-        
-        for (Map.Entry<Integer, String> entry : CATEGORY_MAP.entrySet()) {
-            int categoryCode = entry.getKey();
-            String categoryName = entry.getValue();
-            
+    public Mono<ApiResponse<List<CategoryNewsResponseDto>>> crawlAllCategoryHeadlines() {
+        return Mono.fromCallable(() -> {
             try {
-                List<NewsArticleDto> articles = crawlHeadlinesWithContentByCategory(categoryCode);
-                allCategoryNews.add(new CategoryNewsResponseDto(categoryName, articles));
-                logger.info("카테고리 '{}' 헤드라인 뉴스 크롤링 완료: {}개", categoryName, articles.size());
+                List<CategoryNewsResponseDto> allCategoryNews = new ArrayList<>();
+                
+                for (Map.Entry<Integer, String> entry : CATEGORY_MAP.entrySet()) {
+                    int categoryCode = entry.getKey();
+                    String categoryName = entry.getValue();
+                    
+                    try {
+                        List<NewsArticleDto> articles = crawlHeadlinesWithContentByCategory(categoryCode);
+                        allCategoryNews.add(new CategoryNewsResponseDto(categoryName, articles));
+                        logger.info("카테고리 '{}' 헤드라인 뉴스 크롤링 완료: {}개", categoryName, articles.size());
+                    } catch (Exception e) {
+                        logger.error("카테고리 '{}' 크롤링 중 오류 발생", categoryName, e);
+                        // 오류가 발생한 카테고리는 빈 리스트로 추가
+                        allCategoryNews.add(new CategoryNewsResponseDto(categoryName, new ArrayList<>()));
+                    }
+                }
+                
+                return ApiResponse.success(allCategoryNews);
             } catch (Exception e) {
-                logger.error("카테고리 '{}' 크롤링 중 오류 발생", categoryName, e);
-                // 오류가 발생한 카테고리는 빈 리스트로 추가
-                allCategoryNews.add(new CategoryNewsResponseDto(categoryName, new ArrayList<>()));
+                logger.error("전체 헤드라인 뉴스 크롤링 중 오류 발생", e);
+                return ApiResponse.failure("헤드라인 뉴스 크롤링 중 오류가 발생했습니다: " + e.getMessage());
             }
-        }
-        
-        return allCategoryNews;
+        });
     }
 
     private List<String> parseHeadlineUrlsByCategory(int categoryCode) throws Exception {
