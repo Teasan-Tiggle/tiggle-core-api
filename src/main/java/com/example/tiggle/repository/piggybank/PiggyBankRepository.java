@@ -21,4 +21,7 @@ public interface PiggyBankRepository extends JpaRepository<PiggyBank, Long> {
                                  @Param("amount") BigDecimal amount);
 
     List<PiggyBank> findAllByAutoSavingTrue();
+
+    @EntityGraph(attributePaths = {"owner", "owner.university", "esgCategory"})
+    List<PiggyBank> findAllByAutoDonationTrue();
 }
