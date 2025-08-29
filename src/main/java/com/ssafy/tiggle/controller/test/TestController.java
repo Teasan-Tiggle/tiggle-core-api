@@ -35,14 +35,14 @@ public class TestController {
     @GetMapping("/news")
     public ResponseEntity<ApiResponse<List<CategoryNewsResponseDto>>> getHeadlineNews() {
         log.info("헤드라인 뉴스 조회 테스트 요청");
-        try {
-            List<CategoryNewsResponseDto> headlines = newsCrawlerService.crawlAllCategoryHeadlines();
-            log.info("헤드라인 뉴스 조회 성공 - {} 카테고리", headlines.size());
-            return ResponseEntity.ok(ApiResponse.success(headlines));
-        } catch (Exception e) {
-            log.error("헤드라인 뉴스 조회 중 오류 발생", e);
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponse.failure("헤드라인 뉴스 조회 중 오류가 발생했습니다: " + e.getMessage()));
+        ApiResponse<List<CategoryNewsResponseDto>> response = newsCrawlerService.crawlAllCategoryHeadlines().block();
+        
+        if (response != null && response.isResult()) {
+            log.info("헤드라인 뉴스 조회 성공 - {} 카테고리", response.getData().size());
+            return ResponseEntity.ok(response);
+        } else {
+            log.error("헤드라인 뉴스 조회 실패: {}", response != null ? response.getMessage() : "null response");
+            return ResponseEntity.internalServerError().body(response);
         }
     }
 
@@ -56,13 +56,14 @@ public class TestController {
 
         log.info("스크립트 생성 테스트 요청 - 제목: {}", title);
 
-        try {
-            String script = scriptGenerationService.generateShortFormVideoScript(title, body).block();
-            return ResponseEntity.ok(ApiResponse.success(script));
-        } catch (Exception e) {
-            log.error("스크립트 생성 중 오류 발생", e);
-            return ResponseEntity.internalServerError()
-                    .body(ApiResponse.failure("스크립트 생성 중 오류가 발생했습니다: " + e.getMessage()));
+        ApiResponse<String> response = scriptGenerationService.generateShortFormVideoScript(title, body).block();
+        
+        if (response != null && response.isResult()) {
+            log.info("스크립트 생성 성공 - length: {}", response.getData().length());
+            return ResponseEntity.ok(response);
+        } else {
+            log.error("스크립트 생성 실패: {}", response != null ? response.getMessage() : "null response");
+            return ResponseEntity.internalServerError().body(response);
         }
     }
 
