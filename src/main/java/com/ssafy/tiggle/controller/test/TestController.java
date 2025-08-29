@@ -6,7 +6,6 @@ import com.ssafy.tiggle.dto.shortform.video.GeminiVideoGenerationDto;
 import com.ssafy.tiggle.dto.shortform.video.GeminiVideoStatusDto;
 import com.ssafy.tiggle.service.shortform.news.NewsCrawlerService;
 import com.ssafy.tiggle.service.shortform.script.ScriptGenerationService;
-import com.ssafy.tiggle.service.shortform.tts.TextToSpeechService;
 import com.ssafy.tiggle.service.shortform.video.VideoGenerationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -19,11 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.List;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 @RestController
 @RequestMapping("/api/test")
@@ -32,7 +27,6 @@ import java.util.zip.ZipOutputStream;
 @Tag(name = "Short-form Pipeline Test", description = "숏폼 비디오 생성 파이프라인 각 단계별 테스트 API")
 public class TestController {
 
-    private final TextToSpeechService textToSpeechService;
     private final ScriptGenerationService scriptGenerationService;
     private final NewsCrawlerService newsCrawlerService;
     private final VideoGenerationService videoGenerationService;
@@ -70,53 +64,6 @@ public class TestController {
             return ResponseEntity.internalServerError()
                     .body(ApiResponse.failure("스크립트 생성 중 오류가 발생했습니다: " + e.getMessage()));
         }
-    }
-
-    @GetMapping("/tts")
-    @Operation(summary = "문장별 한국어 TTS 테스트", description = "주어진 한국어 스크립트를 문장별로 분리하여 각각 음성으로 변환한 후 ZIP 파일로 압축하여 반환합니다.")
-    public ResponseEntity<byte[]> testKoreanTts(
-            @Parameter(description = "문장별로 분리하여 음성으로 변환할 한국어 스크립트 (줄바꿈으로 구분)",
-                    example = "안녕하세요, 첫 번째 문장입니다.\n이것은 두 번째 문장이에요.\n마지막 문장입니다.")
-            @RequestParam String script) {
-
-        log.info("문장별 한국어 TTS 테스트 요청 - 스크립트 길이: {}", script.length());
-
-        try {
-            List<byte[]> audioFiles = textToSpeechService.synthesizeSpeechKoreanBySentences(script);
-
-            log.info("문장별 TTS 생성 완료 - {} 개의 음성 파일", audioFiles.size());
-
-            // ZIP 파일로 압축
-            byte[] zipContent = createZipFile(audioFiles);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.parseMediaType("application/zip"));
-            headers.setContentDispositionFormData("attachment", "tts_files.zip");
-
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(zipContent);
-
-        } catch (Exception e) {
-            log.error("문장별 TTS 생성 중 오류 발생", e);
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    private byte[] createZipFile(List<byte[]> audioFiles) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
-            for (int i = 0; i < audioFiles.size(); i++) {
-                ZipEntry entry = new ZipEntry("sentence_" + (i + 1) + ".mp3");
-                zos.putNextEntry(entry);
-                zos.write(audioFiles.get(i));
-                zos.closeEntry();
-            }
-        }
-
-        log.info("ZIP 파일 생성 완료 - {} 개의 TTS 파일 포함", audioFiles.size());
-        return baos.toByteArray();
     }
 
     @PostMapping("/video/generate")
