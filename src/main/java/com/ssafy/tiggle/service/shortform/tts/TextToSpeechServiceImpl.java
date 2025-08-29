@@ -1,4 +1,4 @@
-package com.ssafy.tiggle.service.tts;
+package com.ssafy.tiggle.service.shortform.tts;
 
 import com.google.cloud.texttospeech.v1.*;
 import lombok.RequiredArgsConstructor;

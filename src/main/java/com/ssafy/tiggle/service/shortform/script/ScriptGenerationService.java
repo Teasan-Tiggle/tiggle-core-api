@@ -1,7 +1,7 @@
-package com.ssafy.tiggle.service.openai;
+package com.ssafy.tiggle.service.shortform.script;
 
 import reactor.core.publisher.Mono;
 
-public interface OpenAiService {
+public interface ScriptGenerationService {
     Mono<String> generateShortFormVideoScript(String title, String body);
 }

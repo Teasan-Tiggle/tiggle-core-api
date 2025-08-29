@@ -1,8 +1,8 @@
-package com.ssafy.tiggle.service.video;
+package com.ssafy.tiggle.service.shortform.video;
 
 import com.ssafy.tiggle.dto.common.ApiResponse;
-import com.ssafy.tiggle.dto.video.GeminiVideoGenerationDto;
-import com.ssafy.tiggle.dto.video.GeminiVideoStatusDto;
+import com.ssafy.tiggle.dto.shortform.video.GeminiVideoGenerationDto;
+import com.ssafy.tiggle.dto.shortform.video.GeminiVideoStatusDto;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Mono;
 

@@ -1,4 +1,4 @@
-package com.ssafy.tiggle.dto.video;
+package com.ssafy.tiggle.dto.shortform.video;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;

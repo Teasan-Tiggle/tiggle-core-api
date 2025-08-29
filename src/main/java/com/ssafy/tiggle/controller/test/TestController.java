@@ -1,13 +1,13 @@
 package com.ssafy.tiggle.controller.test;
 
 import com.ssafy.tiggle.dto.common.ApiResponse;
-import com.ssafy.tiggle.dto.news.CategoryNewsResponseDto;
-import com.ssafy.tiggle.dto.video.GeminiVideoGenerationDto;
-import com.ssafy.tiggle.dto.video.GeminiVideoStatusDto;
-import com.ssafy.tiggle.service.news.NewsCrawlerService;
-import com.ssafy.tiggle.service.openai.OpenAiService;
-import com.ssafy.tiggle.service.tts.TextToSpeechService;
-import com.ssafy.tiggle.service.video.VideoGenerationService;
+import com.ssafy.tiggle.dto.shortform.news.CategoryNewsResponseDto;
+import com.ssafy.tiggle.dto.shortform.video.GeminiVideoGenerationDto;
+import com.ssafy.tiggle.dto.shortform.video.GeminiVideoStatusDto;
+import com.ssafy.tiggle.service.shortform.news.NewsCrawlerService;
+import com.ssafy.tiggle.service.shortform.script.ScriptGenerationService;
+import com.ssafy.tiggle.service.shortform.tts.TextToSpeechService;
+import com.ssafy.tiggle.service.shortform.video.VideoGenerationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,7 +33,7 @@ import java.util.zip.ZipOutputStream;
 public class TestController {
 
     private final TextToSpeechService textToSpeechService;
-    private final OpenAiService openAiService;
+    private final ScriptGenerationService scriptGenerationService;
     private final NewsCrawlerService newsCrawlerService;
     private final VideoGenerationService videoGenerationService;
 
@@ -63,7 +63,7 @@ public class TestController {
         log.info("스크립트 생성 테스트 요청 - 제목: {}", title);
 
         try {
-            String script = openAiService.generateShortFormVideoScript(title, body).block();
+            String script = scriptGenerationService.generateShortFormVideoScript(title, body).block();
             return ResponseEntity.ok(ApiResponse.success(script));
         } catch (Exception e) {
             log.error("스크립트 생성 중 오류 발생", e);

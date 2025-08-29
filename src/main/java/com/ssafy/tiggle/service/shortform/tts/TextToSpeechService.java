@@ -1,4 +1,4 @@
-package com.ssafy.tiggle.service.tts;
+package com.ssafy.tiggle.service.shortform.tts;
 
 import java.util.List;
 

@@ -1,6 +1,6 @@
-package com.ssafy.tiggle.service.news;
+package com.ssafy.tiggle.service.shortform.news;
 
-import com.ssafy.tiggle.dto.news.CategoryNewsResponseDto;
+import com.ssafy.tiggle.dto.shortform.news.CategoryNewsResponseDto;
 import java.util.List;
 
 public interface NewsCrawlerService {

@@ -1,10 +1,10 @@
-package com.ssafy.tiggle.service.video;
+package com.ssafy.tiggle.service.shortform.video;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.tiggle.dto.common.ApiResponse;
-import com.ssafy.tiggle.dto.video.GeminiVideoGenerationDto;
-import com.ssafy.tiggle.dto.video.GeminiVideoStatusDto;
+import com.ssafy.tiggle.dto.shortform.video.GeminiVideoGenerationDto;
+import com.ssafy.tiggle.dto.shortform.video.GeminiVideoStatusDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;

@@ -1,4 +1,4 @@
-package com.ssafy.tiggle.service.openai;
+package com.ssafy.tiggle.service.shortform.script;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,15 +12,15 @@ import reactor.util.retry.Retry;
 import java.time.Duration;
 
 @Service
-public class OpenAiServiceImpl implements OpenAiService {
+public class ScriptGenerationServiceImpl implements ScriptGenerationService {
 
-    private static final Logger logger = LoggerFactory.getLogger(OpenAiServiceImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(ScriptGenerationServiceImpl.class);
     private final WebClient openAiWebClient;
 
     @Value("${external-api.openai.model}")
     private String model;
 
-    public OpenAiServiceImpl(WebClient generateAiApiWebClient) {
+    public ScriptGenerationServiceImpl(WebClient generateAiApiWebClient) {
         this.openAiWebClient = generateAiApiWebClient;
     }
 
