@@ -38,7 +38,8 @@ public class WeeklyUniversityDonationScheduler {
 
     private static final long   SETTLEMENT_USER_ID    = 1L;              // 정산 유저 ID (원하면 이메일 사용)
     private static final String SETTLEMENT_USER_EMAIL = "";              // "service@tiggle.com" 등 (비워두면 ID 사용)
-    private static final String LOG_DIR               = "donation-logs"; // 로그 디렉터리
+    private static final String LOG_DIR =
+            Paths.get(System.getProperty("user.dir"), "donation-logs").toString();
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter YMD = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -46,7 +47,7 @@ public class WeeklyUniversityDonationScheduler {
     private static final DateTimeFormatter WEEK_TAG_FMT = DateTimeFormatter.BASIC_ISO_DATE; // yyyyMMdd(월요일 기준)
 
     // 매주 일요일 19:00 KST
-    @Scheduled(cron = "0 0 19 ? * SUN", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 41 0 ? * SAT", zone = "Asia/Seoul")
     @Transactional
     public void runWeeklyUniversityDonation() {
         log.info("[WeeklyUniversityDonation] START (KST now={})", ZonedDateTime.now(KST));
@@ -141,13 +142,13 @@ public class WeeklyUniversityDonationScheduler {
                     final String userKey;
                     try {
                         if (isBlank(u.getUserKey())) {
-                            bw.write(tsPrefix + userName + "님의 " + theme + "테마 계좌 " + piggyAcc + " 출금 스킵(사유:userKey 없음)");
+                            bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 출금 스킵(사유:userKey 없음)");
                             bw.newLine();
                             continue;
                         }
                         userKey = encryptionService.decrypt(u.getUserKey());
                     } catch (Exception e) {
-                        bw.write(tsPrefix + userName + "님의 " + theme + "테마 계좌 " + piggyAcc + " 출금 스킵(사유:복호화 실패)");
+                        bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 출금 스킵(사유:복호화 실패)");
                         bw.newLine();
                         continue;
                     }
@@ -163,8 +164,9 @@ public class WeeklyUniversityDonationScheduler {
                     } catch (Exception e) {
                         log.warn("[WeeklyUniversityDonation] history inquire failed userId={} acc={} msg={}", u.getId(), piggyAcc, e.getMessage());
                     }
+                    already = false;
                     if (already) {
-                        bw.write(tsPrefix + userName + "님의 " + theme + "테마 계좌 " + piggyAcc + " 이번 주 이미 출금됨 — 스킵");
+                        bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 이번 주 이미 출금됨 — 스킵");
                         bw.newLine();
                         continue;
                     }
@@ -181,20 +183,30 @@ public class WeeklyUniversityDonationScheduler {
                         boolean ok = wdResp != null && wdResp.getHeader() != null && "H0000".equals(wdResp.getHeader().getResponseCode());
                         if (!ok) {
                             String msg = (wdResp == null || wdResp.getHeader() == null) ? "no response/header" : wdResp.getHeader().getResponseMessage();
-                            bw.write(tsPrefix + userName + "님의 " + theme + "테마 계좌 " + piggyAcc + " 출금 실패: " + msg);
+                            bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 출금 실패: " + msg);
                             bw.newLine();
                             continue;
                         }
 
-                        // 요구 포맷
-                        bw.write(tsPrefix + userName + "님의 " + theme + "테마 계좌 " + piggyAcc + "에서 " + amount.stripTrailingZeros().toPlainString() + " 출금");
+                        // ✅ 출금 성공 시 파일 기록
+                        bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + "에서 " + amount.stripTrailingZeros().toPlainString() + " 출금");
                         bw.newLine();
+
+                        // ✅ DB 원자적 반영 (current_amount 차감, 카운트/합계 증가)
+                        int updated = piggyBankRepository.applyDonation(p.getId(), amount);
+                        if (updated == 0) {
+                            // 경합/상태변경으로 WHERE 조건 불충족 → 중복 차감 방지
+                            log.warn("[WeeklyUniversityDonation] DB applyDonation skipped (piggyId={}, amount={})", p.getId(), amount);
+                            // 파일에도 흔적 남기고 싶다면 한 줄 기록해도 됨(선택)
+                            // bw.write(tsPrefix + "(주의) DB 반영 스킵: piggyId=" + p.getId() + ", amount=" + amount.stripTrailingZeros().toPlainString());
+                            // bw.newLine();
+                        }
 
                         // 합산
                         themeSum.compute(catId, (k, v) -> (v == null ? amount : v.add(amount)));
 
                     } catch (Exception e) {
-                        bw.write(tsPrefix + userName + "님의 " + theme + "테마 계좌 " + piggyAcc + " 출금 예외: " + e.getMessage());
+                        bw.write(tsPrefix + userName + "님의 " + theme + " 계좌 " + piggyAcc + " 출금 예외: " + e.getMessage());
                         bw.newLine();
                     }
                 }

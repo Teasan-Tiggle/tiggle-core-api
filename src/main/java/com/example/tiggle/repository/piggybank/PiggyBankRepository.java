@@ -24,4 +24,15 @@ public interface PiggyBankRepository extends JpaRepository<PiggyBank, Long> {
 
     @EntityGraph(attributePaths = {"owner", "owner.university", "esgCategory"})
     List<PiggyBank> findAllByAutoDonationTrue();
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+    update PiggyBank p
+       set p.currentAmount       = p.currentAmount - :amount,
+           p.donationCount       = p.donationCount + 1,
+           p.donationTotalAmount = p.donationTotalAmount + :amount
+     where p.id = :piggyId
+       and p.currentAmount >= :amount
+    """)
+    int applyDonation(@Param("piggyId") Long piggyId, @Param("amount") BigDecimal amount);
 }
