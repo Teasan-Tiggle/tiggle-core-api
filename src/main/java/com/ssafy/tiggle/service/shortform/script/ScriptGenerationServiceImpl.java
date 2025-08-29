@@ -1,5 +1,6 @@
 package com.ssafy.tiggle.service.shortform.script;
 
+import com.ssafy.tiggle.dto.common.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,12 +26,19 @@ public class ScriptGenerationServiceImpl implements ScriptGenerationService {
     }
 
     @Override
-    public Mono<String> generateShortFormVideoScript(String title, String body) {
+    public Mono<ApiResponse<String>> generateShortFormVideoScript(String title, String body) {
         logger.info("숏폼 영상 스크립트 생성 시작 - title: {}", title);
 
         String prompt = createShortFormVideoPrompt(title, body);
         return generateResponse(prompt)
-                .doOnNext(script -> logger.info("숏폼 영상 스크립트 생성 완료 - length: {}", script.length()));
+                .map(script -> {
+                    logger.info("숏폼 영상 스크립트 생성 완료 - length: {}", script.length());
+                    return ApiResponse.success(script);
+                })
+                .onErrorResume(error -> {
+                    logger.error("숏폼 영상 스크립트 생성 실패", error);
+                    return Mono.just(ApiResponse.failure("스크립트 생성 중 오류가 발생했습니다: " + error.getMessage()));
+                });
     }
 
     private Mono<String> generateResponse(String prompt) {
