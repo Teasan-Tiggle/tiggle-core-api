@@ -481,27 +481,29 @@ public class AccountServiceImpl implements AccountService {
                     DutchpayShare share = (DutchpayShare) arr[1];
                     Long topUp = (Long) arr[2];
 
-                    // ✅ early exit: 이미 PAID로 들어온 케이스
                     if (topUp == null) return Mono.empty();
+
+                    // ✅ memo에 사용할 더치페이 제목
+                    String memoTitle = (dp.getTitle() != null && !dp.getTitle().isBlank())
+                            ? dp.getTitle()
+                            : "더치페이";
 
                     boolean isCreator = dp.getCreator() != null && dp.getCreator().getId().equals(userId);
 
                     if (isCreator) {
-                        // 생성자: 지분 이체 없음, payMore면 저축만
+                        // 생성자는 지분 이체 없음, payMore만 처리(기존 로직 그대로)
                         Mono<Void> topup = (topUp > 0)
                                 ? transferTiggleToPiggy(encryptedUserKey, userId, dutchpayId, topUp)
                                 .onErrorResume(e -> {
                                     log.warn("[PayMore][creator] 실패 userId={}, dpId={}, {}", userId, dutchpayId, e.getMessage());
-                                    return Mono.empty(); // 저축 실패는 결제 자체 실패로 보지 않음
+                                    return Mono.empty();
                                 })
                                 : Mono.empty();
 
                         return topup.then(
                                 Mono.fromCallable(() -> {
-                                    // ✅ 성공 후 확정 저장
                                     share.settle(payMore, topUp);
                                     shareRepo.saveAndFlush(share);
-
                                     long unpaid = shareRepo.countByDutchpayIdAndStatusNot(dutchpayId, DutchpayShareStatus.PAID);
                                     if (unpaid == 0 && !"COMPLETED".equalsIgnoreCase(dp.getStatus())) {
                                         dp.setStatus("COMPLETED");
@@ -512,7 +514,7 @@ public class AccountServiceImpl implements AccountService {
                                 }).subscribeOn(Schedulers.boundedElastic())
                         ).then();
                     } else {
-                        // 참여자 → 생성자에게 지분 이체
+                        // 참여자 → 생성자 주계좌로 지분 이체
                         Long creatorId = dp.getCreator().getId();
                         Users creator = studentRepository.findById(creatorId)
                                 .orElseThrow(() -> new IllegalStateException("생성자 사용자 없음"));
@@ -524,14 +526,13 @@ public class AccountServiceImpl implements AccountService {
                         String userKey = encryptionService.decrypt(encryptedUserKey);
                         LinkedAccounts payerLink = getLinkedAccounts(userKey, userId);
 
-                        // 1) 지분(원금) 이체
                         return financialApiService.updateDemandDepositAccountTransfer(
                                         payerLink.userKey(),
                                         creatorPrimary, // 입금: 생성자 주계좌
-                                        "[DUTCH][PAY] DP" + dutchpayId + " U" + userId,
+                                        "[DUTCH][PAY] DP" + dutchpayId + " U" + userId, // summary는 태그 유지
                                         String.valueOf(share.getAmount()),
                                         payerLink.primaryAccountNo(), // 출금: 참여자 주계좌
-                                        "더치페이 납부 DP" + dutchpayId + " U" + userId
+                                        memoTitle // ✅ 메모에 더치페이 제목 적용
                                 )
                                 .timeout(Duration.ofSeconds(5))
                                 .flatMap(resp -> {
@@ -541,7 +542,6 @@ public class AccountServiceImpl implements AccountService {
                                         return Mono.error(new IllegalStateException("지분 이체 실패: " + msg));
                                     }
 
-                                    // 2) payMore면 저축
                                     Mono<Void> topup = (topUp > 0)
                                             ? transferTiggleToPiggy(encryptedUserKey, userId, dutchpayId, topUp)
                                             .onErrorResume(e -> {
@@ -550,7 +550,6 @@ public class AccountServiceImpl implements AccountService {
                                             })
                                             : Mono.empty();
 
-                                    // 3) ✅ 성공 후 확정 저장
                                     return topup.then(
                                             Mono.fromCallable(() -> {
                                                 share.settle(payMore, topUp);
