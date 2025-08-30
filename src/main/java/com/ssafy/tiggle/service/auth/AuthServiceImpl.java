@@ -2,10 +2,10 @@ package com.ssafy.tiggle.service.auth;
 
 import com.ssafy.tiggle.dto.finopenapi.response.UserResponse;
 import com.ssafy.tiggle.dto.auth.JoinRequestDto;
-import com.ssafy.tiggle.entity.Department;
-import com.ssafy.tiggle.entity.Users;
-import com.ssafy.tiggle.entity.University;
+import com.ssafy.tiggle.entity.*;
 import com.ssafy.tiggle.exception.auth.AuthException;
+import com.ssafy.tiggle.repository.donation.UserCharacterRepository;
+import com.ssafy.tiggle.repository.esg.EsgCategoryRepository;
 import com.ssafy.tiggle.repository.university.DepartmentRepository;
 import com.ssafy.tiggle.repository.user.StudentRepository;
 import com.ssafy.tiggle.repository.university.UniversityRepository;
@@ -31,6 +31,8 @@ public class AuthServiceImpl implements AuthService {
     private final StudentRepository studentRepository;
     private final UniversityRepository universityRepository;
     private final DepartmentRepository departmentRepository;
+    private final UserCharacterRepository userCharacterRepository;
+    private final EsgCategoryRepository esgCategoryRepository;
     private final PasswordEncoder passwordEncoder;
     private final FinancialApiService financialApiService;
     private final EncryptionService encryptionService;
@@ -106,6 +108,25 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             logger.error("사용자 정보 저장 실패: {}", requestDto.getEmail(), e);
             throw AuthException.externalApiFailure("DB 사용자 정보 저장 중 오류가 발생했습니다.", e);
+        }
+
+        EsgCategory defaultCategory = esgCategoryRepository.findById(1L)
+                .orElseThrow(() -> new IllegalArgumentException("기본 ESG 카테고리가 존재하지 않습니다."));
+
+        // 7. 캐릭터 생성
+        UserCharacter userCharacter = UserCharacter.builder()
+                .user(user)
+                .esgCategory(defaultCategory)
+                .level(1)
+                .experiencePoints(0L)
+                .heart(0)
+                .build();
+
+        try {
+            userCharacterRepository.save(userCharacter);
+        } catch (Exception e) {
+            logger.error("사용자 캐릭터 저장 실패: {}", requestDto.getEmail(), e);
+            throw AuthException.externalApiFailure("DB 사용자 캐릭터 저장 중 오류가 발생했습니다.", e);
         }
     }
 

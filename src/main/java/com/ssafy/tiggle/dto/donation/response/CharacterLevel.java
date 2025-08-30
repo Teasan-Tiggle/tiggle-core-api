@@ -1,7 +1,6 @@
 package com.ssafy.tiggle.dto.donation.response;
 
-public record DonationGrowthLevel(
-        Long totalAmount,
+public record CharacterLevel(
 
         Long experiencePoints,
         Long toNextLevel,

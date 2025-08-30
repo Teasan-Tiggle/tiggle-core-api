@@ -192,4 +192,19 @@ public class DonationController {
         List<DonationRanking> response = donationService.getDepartmentRanking(userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+
+    /**
+     * 하트 누르기
+     *
+     * @return 학교 랭킹 목록
+     */
+    @PostMapping("/heart")
+    @Operation(summary = "하트 누르기", description = "하트를 하나 소모하고 경험치를 증가시킵니다.")
+    @ApiResponses(value = {
+    })
+    public ResponseEntity<ApiResponse<CharacterLevel>> useHeart() {
+        Long userId = JwtUtil.getCurrentUserId();
+        CharacterLevel response = donationService.useHeart(userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }
