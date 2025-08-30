@@ -37,7 +37,7 @@ public class WeeklyAutoSavingScheduler {
     private static final DateTimeFormatter YMD = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter WEEK_TAG_FMT = DateTimeFormatter.BASIC_ISO_DATE; // yyyyMMdd (월요일 기준)
 
-    @Scheduled(cron = "0 0 18 ? * SUN", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0 1 ? * MON", zone = "Asia/Seoul")
     @Transactional
     public void runWeeklyChangeSweep() {
         log.info("[WeeklyAutoSaving] START (KST now={})", ZonedDateTime.now(KST));

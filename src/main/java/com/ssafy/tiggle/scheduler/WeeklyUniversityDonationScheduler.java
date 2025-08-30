@@ -45,8 +45,7 @@ public class WeeklyUniversityDonationScheduler {
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter WEEK_TAG_FMT = DateTimeFormatter.BASIC_ISO_DATE;
 
-    // 매주 일요일 19:00 KST
-    @Scheduled(cron = "0 56 6 ? * SAT", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0 2 ? * MON", zone = "Asia/Seoul")
     @Transactional
     public void runWeeklyUniversityDonation() {
         log.info("[WeeklyUniversityDonation] START (KST now={})", ZonedDateTime.now(KST));
@@ -259,8 +258,6 @@ public class WeeklyUniversityDonationScheduler {
 
         log.info("[WeeklyUniversityDonation] END");
     }
-
-    // ===== Helpers =====
 
     private Users resolveSettlementUser() {
         if (!isBlank(SETTLEMENT_USER_EMAIL))
