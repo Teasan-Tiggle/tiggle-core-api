@@ -33,19 +33,6 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
 
 * **다양한 기부처 선택**, **투명한 내역 관리(DonationHistory)**
 * **주간 정산**(대학/테마별 합산 송금), **랭킹/통계 제공**
-* **캐시 업데이트**로 조회 성능 최적화
-
-```java
-// DonationService.java (발췌)
-public interface DonationService {
-    DonationStatus getUniversityDonationStatus(Long userId);
-    DonationStatus getTotalDonationStatus();
-    List<DonationRanking> getUniversityRanking();
-    List<DonationRanking> getDepartmentRanking(Long userId);
-    @Transactional void transferDonations();
-    @Transactional(readOnly = true) void updateRankingCache();
-}
-```
 
 ### 💸 더치페이
 
@@ -72,37 +59,24 @@ public void runWeeklyChangeSweep() { /* autoSaving 사용자 주간 이체 */ }
 
 * FCM으로 **더치페이/기부/목표 달성** 등 주요 이벤트 실시간 푸시
 
-### 🎬 AI 콘텐츠(옵션)
-
-* **TTS**(Google Cloud)로 공지/요약 음성 변환
-* **Generative Video**로 기부/목표 달성 하이라이트 영상 생성
-
 ---
 
 ## ⏰ 스케줄러 (개요)
 
-1. **WeeklyAutoSavingScheduler** — *일요일 18:00 KST*
+1. **WeeklyAutoSavingScheduler** — *월요일 01:00 KST*
 
    * 주계좌 잔액의 **천원 미만** 금액을 저금통으로 자동 이체
-   * 주차 태그(`[W:yyyyMMdd]`)로 **멱등** 보장(중복 실행 방지)
+   * 주차 태그(`[W:yyyyMMdd]`)로 **멱등성** 보장(중복 실행 방지)
 
-2. **WeeklyUniversityDonationScheduler** — *토요일 06:56 KST*
+2. **WeeklyUniversityDonationScheduler** — *월요일 02:00 KST*
 
    * 목표 달성 + 자동기부 ON 사용자 금액을 **대학 테마 계좌로 합산 송금**
    * `donation_ready=1→0` **슬롯 선점(UPDATE)** 로 중복 처리 방지
    * 처리 결과 **파일 로깅**, 실패 시 플래그 복구로 **다음 주기 재시도**
 
-3. **DonationScheduler** — *일요일 20:00 KST*
+3. **DonationScheduler** — *월요일 06:00 KST*
 
-   * 주중 모인 금액 **최종 송금**, **랭킹 캐시 업데이트**
-
-```java
-@Scheduled(cron = "0 0 20 * * SUN", zone = "Asia/Seoul")
-public void runWeeklyDonation() {
-    donationService.transferDonations();
-    donationService.updateRankingCache();
-}
-```
+   * 주중 모인 금액 기부 단체로 **최종 송금**
 
 ---
 
@@ -121,8 +95,6 @@ return financialApiService.inquireDemandDepositAccountBalance(userKey, accNo)
         : Mono.error(DonationException.accountBalance(/*...*/)))
     .then(Mono.fromCallable(() -> donationHistoryRepository.save(/*...*/)));
 ```
-
-> **주의**: WebClient는 비동기지만 **JPA는 블로킹**. 필요 시 `Schedulers.boundedElastic()` 오프로딩 또는 명령형 `@Transactional` 경계 내 처리 권장.
 
 ### 2) 랭킹/통계 집계 (JPQL + Projection)
 
@@ -151,7 +123,7 @@ public interface RankingProjection {
 
 * **Backend**: Spring Boot 3.5.4, Java 17, Spring Security(JWT), Spring Data JPA, WebClient(WebFlux), MySQL 8.4, Redis 7, SpringDoc(OpenAPI)
 * **DevOps**: GitHub Actions, Docker
-* **External**: Firebase Admin SDK, CoolSMS, Google Cloud TTS/Generative, Jsoup
+* **External**: Firebase Admin SDK, CoolSMS, Gemini Veo3, GPT-4o-mini, Jsoup
 
 ---
 
@@ -166,33 +138,6 @@ public interface RankingProjection {
 ```bash
 ./gradlew build
 java -jar build/libs/tiggle-0.0.1-SNAPSHOT.jar
-# 기본: http://43.203.36.96:80
-```
-
----
-
-## 📖 API 문서
-
-* Swagger UI: **`http://43.203.36.96/swagger-ui/index.html`**
-
----
-
-## 📁 패키지 구조
-
-```
-com.ssafy.tiggle
-├── config           # Security/Swagger/Web 설정
-├── constants        # 상수
-├── controller       # REST API
-├── domain           # 도메인 이벤트 등
-├── dto              # Request/Response DTO
-├── entity           # JPA 엔티티
-├── exception        # 전역/커스텀 예외
-├── repository       # JPA Repository
-├── scheduler        # 스케줄러
-├── security         # JWT/필터
-├── service          # 비즈니스 로직
-└── util             # 유틸
 ```
 
 ---
