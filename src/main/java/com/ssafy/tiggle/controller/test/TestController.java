@@ -8,6 +8,7 @@ import com.ssafy.tiggle.dto.shortform.video.GeminiVideoStatusDto;
 import com.ssafy.tiggle.service.shortform.news.NewsCrawlerService;
 import com.ssafy.tiggle.service.shortform.script.ScriptGenerationService;
 import com.ssafy.tiggle.service.shortform.video.VideoGenerationService;
+import com.ssafy.tiggle.service.videostorage.VideoStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -260,5 +262,31 @@ public class TestController {
     
     private byte[] testVideoConcatenation(List<byte[]> videoList) {
         return videoGenerationService.testVideoConcatenation(videoList);
+    }
+
+    private final VideoStorageService videoStorageService;
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> uploadVideo(@RequestParam MultipartFile file) throws IOException {
+        String filename = file.getOriginalFilename();
+        if (filename == null || filename.isEmpty()) {
+            return ResponseEntity.badRequest().body("Invalid file name.");
+        }
+        videoStorageService.saveVideo(file.getBytes(), filename);
+        return ResponseEntity.ok("Video uploaded successfully: " + filename);
+    }
+
+    @GetMapping("/download")
+    public ResponseEntity<byte[]> downloadVideo2(@RequestParam("path") String path) throws IOException {
+        byte[] videoBytes = videoStorageService.loadVideo(path);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.valueOf("video/mp4"));
+        headers.setContentDispositionFormData("attachment", "video.mp4");
+        headers.setContentLength(videoBytes.length);
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(videoBytes);
     }
 }
