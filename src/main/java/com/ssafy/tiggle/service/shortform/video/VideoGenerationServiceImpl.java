@@ -61,38 +61,41 @@ public class VideoGenerationServiceImpl implements VideoGenerationService {
 
     @Override
     public Mono<ApiResponse<GeminiVideoGenerationDto>> generateVideo(String textPrompt) {
-        return Mono.fromCallable(() -> {
-            try {
-                log.info("Gemini 비디오 생성 시작 - 프롬프트 길이: {} 문자", textPrompt.length());
-                
-                // 요청 본문 구성
-                Map<String, Object> requestBody = Map.of(
-                    "instances", Collections.singletonList(Map.of(
-                        "prompt", textPrompt
-                    ))
-                );
-                
-                // REST API 호출
-                String response = geminiWebClient.post()
-                        .uri("/models/" + GEMINI_VIDEO_MODEL + ":predictLongRunning")
-                        .bodyValue(requestBody)
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .block(Duration.ofMinutes(2));
-                
-                // 응답에서 operation name 추출
-                JsonNode responseNode = objectMapper.readTree(response);
-                String operationName = responseNode.path("name").asText();
-                
-                log.info("Gemini 비디오 생성 작업 시작 완료 - Operation Name: {}", operationName);
-                GeminiVideoGenerationDto generationDto = GeminiVideoGenerationDto.of(operationName);
-                return ApiResponse.success(generationDto);
-                
-            } catch (Exception e) {
-                log.error("Gemini 비디오 생성 실패 - 오류: {}", e.getMessage(), e);
-                return ApiResponse.failure("Gemini 비디오 생성에 실패했습니다: " + e.getMessage());
-            }
-        });
+        log.info("Gemini 비디오 생성 시작 - 프롬프트 길이: {} 문자", textPrompt.length());
+        
+        // 요청 본문 구성
+        Map<String, Object> requestBody = Map.of(
+            "instances", Collections.singletonList(Map.of(
+                "prompt", textPrompt
+            ))
+        );
+        
+        // REST API 호출
+        return geminiWebClient.post()
+                .uri("/models/" + GEMINI_VIDEO_MODEL + ":predictLongRunning")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(String.class)
+                .timeout(Duration.ofMinutes(2))
+                .map(response -> {
+                    try {
+                        // 응답에서 operation name 추출
+                        JsonNode responseNode = objectMapper.readTree(response);
+                        String operationName = responseNode.path("name").asText();
+                        
+                        log.info("Gemini 비디오 생성 작업 시작 완료 - Operation Name: {}", operationName);
+                        GeminiVideoGenerationDto generationDto = GeminiVideoGenerationDto.of(operationName);
+                        return ApiResponse.success(generationDto);
+                        
+                    } catch (Exception e) {
+                        log.error("Gemini 비디오 생성 응답 파싱 실패 - 오류: {}", e.getMessage(), e);
+                        return ApiResponse.<GeminiVideoGenerationDto>failure("응답 파싱에 실패했습니다: " + e.getMessage());
+                    }
+                })
+                .onErrorResume(e -> {
+                    log.error("Gemini 비디오 생성 실패 - 오류: {}", e.getMessage(), e);
+                    return Mono.just(ApiResponse.failure("Gemini 비디오 생성에 실패했습니다: " + e.getMessage()));
+                });
     }
 
     @Override
@@ -106,198 +109,270 @@ public class VideoGenerationServiceImpl implements VideoGenerationService {
                 String base64Image = Base64.getEncoder().encodeToString(imageFile.getBytes());
                 
                 // 요청 본문 구성 (Gemini API Image 객체 형식)
-                Map<String, Object> requestBody = Map.of(
+                return Map.of(
                     "instances", Collections.singletonList(Map.of(
                         "prompt", textPrompt,
                         "image", Map.of(
                             "bytesBase64Encoded", base64Image,
-                            "mimeType", imageFile.getContentType()
+                            "mimeType", imageFile.getContentType() != null ? imageFile.getContentType() : "image/jpeg"
                         )
                     ))
                 );
-                
-                // REST API 호출
-                String response = geminiWebClient.post()
-                        .uri("/models/" + GEMINI_VIDEO_MODEL + ":predictLongRunning")
-                        .bodyValue(requestBody)
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .block(Duration.ofMinutes(2));
-                
-                // 응답에서 operation name 추출
-                JsonNode responseNode = objectMapper.readTree(response);
-                String operationName = responseNode.path("name").asText();
-                
-                log.info("Gemini 이미지 기반 비디오 생성 작업 시작 완료 - Operation Name: {}", operationName);
-                GeminiVideoGenerationDto generationDto = GeminiVideoGenerationDto.of(operationName);
-                return ApiResponse.success(generationDto);
-                
             } catch (Exception e) {
-                log.error("Gemini 이미지 기반 비디오 생성 실패 - 오류: {}", e.getMessage(), e);
-                return ApiResponse.failure("Gemini 이미지 기반 비디오 생성에 실패했습니다: " + e.getMessage());
+                throw new RuntimeException("이미지 처리 실패: " + e.getMessage(), e);
             }
+        })
+        .flatMap(requestBody -> {
+            // REST API 호출
+            return geminiWebClient.post()
+                    .uri("/models/" + GEMINI_VIDEO_MODEL + ":predictLongRunning")
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofMinutes(2))
+                    .map(response -> {
+                        try {
+                            // 응답에서 operation name 추출
+                            JsonNode responseNode = objectMapper.readTree(response);
+                            String operationName = responseNode.path("name").asText();
+                            
+                            log.info("Gemini 이미지 기반 비디오 생성 작업 시작 완료 - Operation Name: {}", operationName);
+                            GeminiVideoGenerationDto generationDto = GeminiVideoGenerationDto.of(operationName);
+                            return ApiResponse.success(generationDto);
+                            
+                        } catch (Exception e) {
+                            log.error("Gemini 이미지 기반 비디오 생성 응답 파싱 실패 - 오류: {}", e.getMessage(), e);
+                            return ApiResponse.<GeminiVideoGenerationDto>failure("응답 파싱에 실패했습니다: " + e.getMessage());
+                        }
+                    });
+        })
+        .onErrorResume(e -> {
+            log.error("Gemini 이미지 기반 비디오 생성 실패 - 오류: {}", e.getMessage(), e);
+            return Mono.just(ApiResponse.failure("Gemini 이미지 기반 비디오 생성에 실패했습니다: " + e.getMessage()));
         });
     }
 
     @Override
     public Mono<ApiResponse<GeminiVideoStatusDto>> getVideoStatus(String operationName) {
-        return Mono.fromCallable(() -> {
-            try {
-                log.debug("Gemini 비디오 상태 확인 시작 - Operation Name: {}", operationName);
-                
-                // REST API 호출
-                String response = geminiWebClient.get()
-                        .uri("/" + operationName)
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .block(Duration.ofSeconds(30));
-                
-                // 응답 파싱
-                JsonNode responseNode = objectMapper.readTree(response);
-                
-                if (responseNode.has("done") && responseNode.path("done").asBoolean()) {
-                    if (responseNode.has("error")) {
-                        log.error("Gemini 비디오 생성 실패 - Operation Name: {}, 오류: {}", 
-                                  operationName, responseNode.path("error").toString());
-                        return ApiResponse.failure("비디오 생성이 실패했습니다: " + responseNode.path("error").toString());
+        log.debug("Gemini 비디오 상태 확인 시작 - Operation Name: {}", operationName);
+        
+        // REST API 호출
+        return geminiWebClient.get()
+                .uri("/" + operationName)
+                .retrieve()
+                .bodyToMono(String.class)
+                .timeout(Duration.ofSeconds(30))
+                .map(response -> {
+                    try {
+                        // 응답 파싱
+                        JsonNode responseNode = objectMapper.readTree(response);
+                        
+                        if (responseNode.has("done") && responseNode.path("done").asBoolean()) {
+                            if (responseNode.has("error")) {
+                                log.error("Gemini 비디오 생성 실패 - Operation Name: {}, 오류: {}", 
+                                          operationName, responseNode.path("error").toString());
+                                return ApiResponse.<GeminiVideoStatusDto>failure("비디오 생성이 실패했습니다: " + responseNode.path("error").toString());
+                            }
+                            
+                            JsonNode generateVideoResponse = responseNode.path("response").path("generateVideoResponse");
+                            
+                            // 콘텐츠 필터링 확인
+                            if (generateVideoResponse.has("raiMediaFilteredCount")) {
+                                int filteredCount = generateVideoResponse.path("raiMediaFilteredCount").asInt();
+                                if (filteredCount > 0) {
+                                    JsonNode filteredReasons = generateVideoResponse.path("raiMediaFilteredReasons");
+                                    String reasonsText = "";
+                                    if (filteredReasons.isArray() && filteredReasons.size() > 0) {
+                                        reasonsText = filteredReasons.get(0).asText();
+                                    }
+                                    
+                                    log.error("Gemini 콘텐츠 필터링으로 비디오 생성 거부 - Operation: {}, 사유: {}", operationName, reasonsText);
+                                    return ApiResponse.<GeminiVideoStatusDto>failure("비디오 생성이 거부되었습니다: " + reasonsText);
+                                }
+                            }
+                            
+                            // 정상적인 비디오 URI 추출
+                            JsonNode generatedSamples = generateVideoResponse.path("generatedSamples");
+                            
+                            if (generatedSamples.isArray() && !generatedSamples.isEmpty()) {
+                                JsonNode firstSample = generatedSamples.get(0);
+                                if (firstSample != null && !firstSample.isNull()) {
+                                    String videoUri = firstSample.path("video").path("uri").asText();
+                                    if (!videoUri.isEmpty()) {
+                                        log.info("Gemini 비디오 생성 완료 - Operation Name: {}, Video URI: {}", operationName, videoUri);
+                                        GeminiVideoStatusDto statusDto = GeminiVideoStatusDto.completed(operationName, videoUri);
+                                        return ApiResponse.success(statusDto);
+                                    }
+                                }
+                            }
+                            
+                            // generatedSamples가 없으면 예상치 못한 응답 구조
+                            log.error("예상치 못한 Gemini API 응답 구조 - Operation: {}, Response: {}", operationName, responseNode.toPrettyString());
+                            return ApiResponse.<GeminiVideoStatusDto>failure("예상치 못한 API 응답 구조입니다.");
+                        } else {
+                            log.debug("Gemini 비디오 생성 진행 중 - Operation Name: {}", operationName);
+                            GeminiVideoStatusDto statusDto = GeminiVideoStatusDto.processing(operationName);
+                            return ApiResponse.success(statusDto);
+                        }
+                        
+                    } catch (Exception e) {
+                        log.error("Gemini 비디오 상태 확인 응답 파싱 실패 - Operation Name: {}, 오류: {}", operationName, e.getMessage(), e);
+                        return ApiResponse.<GeminiVideoStatusDto>failure("응답 파싱에 실패했습니다: " + e.getMessage());
                     }
-                    
-                    // 비디오 URI 추출
-                    String videoUri = responseNode.path("response")
-                            .path("generateVideoResponse")
-                            .path("generatedSamples")
-                            .get(0)
-                            .path("video")
-                            .path("uri")
-                            .asText();
-                    
-                    log.info("Gemini 비디오 생성 완료 - Operation Name: {}, Video URI: {}", operationName, videoUri);
-                    GeminiVideoStatusDto statusDto = GeminiVideoStatusDto.completed(operationName, videoUri);
-                    return ApiResponse.success(statusDto);
-                } else {
-                    log.debug("Gemini 비디오 생성 진행 중 - Operation Name: {}", operationName);
-                    GeminiVideoStatusDto statusDto = GeminiVideoStatusDto.processing(operationName);
-                    return ApiResponse.success(statusDto);
-                }
-                
-            } catch (Exception e) {
-                log.error("Gemini 비디오 상태 확인 실패 - Operation Name: {}, 오류: {}", operationName, e.getMessage(), e);
-                return ApiResponse.failure("비디오 상태 확인에 실패했습니다: " + e.getMessage());
-            }
-        });
+                })
+                .onErrorResume(e -> {
+                    log.error("Gemini 비디오 상태 확인 실패 - Operation Name: {}, 오류: {}", operationName, e.getMessage(), e);
+                    return Mono.just(ApiResponse.failure("비디오 상태 확인에 실패했습니다: " + e.getMessage()));
+                });
     }
 
     @Override
     public Mono<byte[]> downloadVideo(String operationName) {
-        return Mono.fromCallable(() -> {
-            try {
-                log.info("Gemini 비디오 다운로드 시작 - Operation Name: {}", operationName);
-                
-                // 먼저 operation 상태를 확인하여 비디오 URI를 얻음
-                String response = geminiWebClient.get()
-                        .uri("/" + operationName)
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .block(Duration.ofSeconds(30));
-                
-                // 응답에서 비디오 URI 추출
-                JsonNode responseNode = objectMapper.readTree(response);
-                
-                if (!responseNode.has("done") || !responseNode.path("done").asBoolean()) {
-                    throw new RuntimeException("비디오가 아직 생성되지 않았습니다");
-                }
-                
-                if (responseNode.has("error")) {
-                    throw new RuntimeException("비디오 생성이 실패했습니다: " + responseNode.path("error").toString());
-                }
-                
-                // API 응답 구조에 따라 비디오 URI 추출
-                String videoUri = responseNode.path("response")
-                    .path("generateVideoResponse")
-                    .path("generatedSamples")
-                    .get(0)
-                    .path("video")
-                    .path("uri")
-                    .asText();
-                
-                if (videoUri.isEmpty()) {
-                    throw new RuntimeException("비디오 URI를 찾을 수 없습니다");
-                }
-                
-                log.info("비디오 URI 추출 완료: {}", videoUri);
-                
-                // 기존 geminiWebClient를 사용하여 비디오 다운로드
-                return geminiWebClient.get()
-                        .uri(videoUri)
-                        .retrieve()
-                        .bodyToMono(byte[].class)
-                        .timeout(Duration.ofMinutes(5))
-                        .doOnNext(videoBytes -> {
-                            log.info("Gemini 비디오 다운로드 완료 - Operation Name: {}, 크기: {} bytes", 
-                                    operationName, videoBytes.length);
-                        })
-                        .doOnError(error -> log.error("Gemini 비디오 다운로드 실패 - Operation Name: {}, 오류: {}", 
-                                                    operationName, error.getMessage()))
-                        .block();
-                
-            } catch (Exception e) {
-                log.error("Gemini 비디오 다운로드 실패 - Operation Name: {}, 오류: {}", operationName, e.getMessage(), e);
-                throw new RuntimeException("Gemini 비디오 다운로드에 실패했습니다", e);
-            }
-        });
+        log.info("Gemini 비디오 다운로드 시작 - Operation Name: {}", operationName);
+        
+        // 먼저 operation 상태를 확인하여 비디오 URI를 얻음
+        return geminiWebClient.get()
+                .uri("/" + operationName)
+                .retrieve()
+                .bodyToMono(String.class)
+                .timeout(Duration.ofSeconds(30))
+                .flatMap(response -> {
+                    try {
+                        // 응답에서 비디오 URI 추출
+                        JsonNode responseNode = objectMapper.readTree(response);
+                        
+                        if (!responseNode.has("done") || !responseNode.path("done").asBoolean()) {
+                            return Mono.error(new RuntimeException("비디오가 아직 생성되지 않았습니다"));
+                        }
+                        
+                        if (responseNode.has("error")) {
+                            return Mono.error(new RuntimeException("비디오 생성이 실패했습니다: " + responseNode.path("error").toString()));
+                        }
+                        
+                        JsonNode generateVideoResponse = responseNode.path("response").path("generateVideoResponse");
+                        
+                        // 콘텐츠 필터링 확인
+                        if (generateVideoResponse.has("raiMediaFilteredCount")) {
+                            int filteredCount = generateVideoResponse.path("raiMediaFilteredCount").asInt();
+                            if (filteredCount > 0) {
+                                JsonNode filteredReasons = generateVideoResponse.path("raiMediaFilteredReasons");
+                                String reasonsText = "콘텐츠 정책 위반";
+                                if (filteredReasons.isArray() && !filteredReasons.isEmpty()) {
+                                    reasonsText = filteredReasons.get(0).asText();
+                                }
+                                return Mono.error(new RuntimeException("비디오 생성이 거부되었습니다: " + reasonsText));
+                            }
+                        }
+                        
+                        // 정상적인 비디오 URI 추출
+                        JsonNode generatedSamples = generateVideoResponse.path("generatedSamples");
+                        
+                        String videoUri = "";
+                        if (generatedSamples.isArray() && !generatedSamples.isEmpty()) {
+                            JsonNode firstSample = generatedSamples.get(0);
+                            if (firstSample != null && !firstSample.isNull()) {
+                                videoUri = firstSample.path("video").path("uri").asText();
+                            }
+                        }
+                        
+                        if (videoUri.isEmpty()) {
+                            return Mono.error(new RuntimeException("비디오 URI를 찾을 수 없습니다 - generatedSamples가 비어있거나 콘텐츠 필터링됨"));
+                        }
+                        
+                        log.info("비디오 URI 추출 완료: {}", videoUri);
+                        
+                        // 기존 geminiWebClient를 사용하여 비디오 다운로드
+                        return geminiWebClient.get()
+                                .uri(videoUri)
+                                .retrieve()
+                                .bodyToMono(byte[].class)
+                                .timeout(Duration.ofMinutes(5))
+                                .doOnNext(videoBytes -> {
+                                    log.info("Gemini 비디오 다운로드 완료 - Operation Name: {}, 크기: {} bytes", 
+                                            operationName, videoBytes.length);
+                                })
+                                .doOnError(error -> log.error("Gemini 비디오 다운로드 실패 - Operation Name: {}, 오류: {}", 
+                                                            operationName, error.getMessage()));
+                        
+                    } catch (Exception e) {
+                        log.error("비디오 URI 추출 실패 - Operation Name: {}, 오류: {}", operationName, e.getMessage(), e);
+                        return Mono.error(new RuntimeException("비디오 URI 추출에 실패했습니다: " + e.getMessage(), e));
+                    }
+                })
+                .onErrorMap(e -> {
+                    if (e instanceof RuntimeException) {
+                        return e;
+                    }
+                    log.error("Gemini 비디오 다운로드 실패 - Operation Name: {}, 오류: {}", operationName, e.getMessage(), e);
+                    return new RuntimeException("Gemini 비디오 다운로드에 실패했습니다", e);
+                });
     }
 
     @Override
     public Mono<ApiResponse<byte[]>> generateFullVideoFromSections(List<VideoSectionDto> sections) {
-        return Mono.fromCallable(() -> {
-            try {
-                log.info("풀 영상 생성 시작 - 총 {} 섹션", sections.size());
-                
-                if (sections.isEmpty()) {
-                    return ApiResponse.failure("생성할 섹션이 없습니다.");
+        if (sections.isEmpty()) {
+            return Mono.just(ApiResponse.failure("생성할 섹션이 없습니다."));
+        }
+        
+        log.info("풀 영상 생성 시작 - 총 {} 섹션", sections.size());
+        
+        // 첫 번째 섹션부터 순차적으로 처리
+        return generateSectionVideoReactive(sections.get(0).getScript())
+            .flatMap(firstVideoBytes -> {
+                if (sections.size() == 1) {
+                    // 단일 섹션인 경우
+                    log.info("단일 섹션 영상 생성 완료 - 크기: {} bytes", firstVideoBytes.length);
+                    return Mono.just(ApiResponse.success(firstVideoBytes));
                 }
                 
-                List<byte[]> sectionVideos = new ArrayList<>();
-                byte[] lastFrameImage = null;
-                
-                // 각 섹션별로 영상 생성
-                for (int i = 0; i < sections.size(); i++) {
-                    VideoSectionDto section = sections.get(i);
-                    log.info("섹션 {} 영상 생성 시작 - {}", section.getSectionNumber(), 
-                            section.getScript().substring(0, Math.min(50, section.getScript().length())));
-                    
-                    byte[] sectionVideoBytes;
-                    
-                    if (i == 0) {
-                        // 첫 번째 섹션은 텍스트 프롬프트만 사용
-                        sectionVideoBytes = generateSectionVideo(section.getScript());
-                    } else {
-                        // 두 번째 섹션부터는 이전 영상의 마지막 프레임을 시작 이미지로 사용
-                        MultipartFile lastFrameFile = createMultipartFileFromBytes(lastFrameImage, "last_frame.jpg");
-                        sectionVideoBytes = generateSectionVideoWithImage(section.getScript(), lastFrameFile);
-                    }
-                    
-                    sectionVideos.add(sectionVideoBytes);
-                    log.info("섹션 {} 영상 생성 완료 - 크기: {} bytes", section.getSectionNumber(), sectionVideoBytes.length);
-                    
-                    // 다음 섹션을 위해 마지막 프레임 추출 (마지막 섹션은 제외)
-                    if (i < sections.size() - 1) {
-                        lastFrameImage = extractLastFrame(sectionVideoBytes);
-                        log.info("섹션 {} 마지막 프레임 추출 완료", section.getSectionNumber());
-                    }
-                }
-                
-                // 모든 섹션 영상을 이어붙이기
-                byte[] finalVideo = concatenateVideos(sectionVideos);
-                log.info("풀 영상 생성 완료 - 최종 크기: {} bytes", finalVideo.length);
-                
-                return ApiResponse.success(finalVideo);
-                
-            } catch (Exception e) {
+                // 다중 섹션 처리를 위한 재귀적 체이닝
+                List<byte[]> initialList = new ArrayList<>();
+                initialList.add(firstVideoBytes);
+                return generateRemainingVideos(sections, 1, initialList, firstVideoBytes);
+            })
+            .onErrorResume(e -> {
                 log.error("풀 영상 생성 실패", e);
-                return ApiResponse.failure("풀 영상 생성 중 오류가 발생했습니다: " + e.getMessage());
-            }
-        });
+                return Mono.just(ApiResponse.failure("풀 영상 생성 중 오류가 발생했습니다: " + e.getMessage()));
+            });
+    }
+    
+    private Mono<ApiResponse<byte[]>> generateRemainingVideos(List<VideoSectionDto> sections, 
+                                                            int currentIndex, 
+                                                            List<byte[]> completedVideos, 
+                                                            byte[] lastVideoBytes) {
+        if (currentIndex >= sections.size()) {
+            // 모든 섹션 완료 - 비디오 연결
+            return Mono.fromCallable(() -> {
+                try {
+                    byte[] finalVideo = concatenateVideos(completedVideos);
+                    log.info("풀 영상 생성 완료 - 최종 크기: {} bytes", finalVideo.length);
+                    return ApiResponse.success(finalVideo);
+                } catch (Exception e) {
+                    log.error("비디오 연결 실패", e);
+                    return ApiResponse.<byte[]>failure("비디오 연결 중 오류가 발생했습니다: " + e.getMessage());
+                }
+            });
+        }
+        
+        VideoSectionDto currentSection = sections.get(currentIndex);
+        log.info("섹션 {} 영상 생성 시작 - {}", currentSection.getSectionNumber(), 
+                currentSection.getScript().substring(0, Math.min(50, currentSection.getScript().length())));
+        
+        // 이전 영상의 마지막 프레임 추출
+        return Mono.fromCallable(() -> extractLastFrame(lastVideoBytes))
+            .flatMap(lastFrameImage -> {
+                MultipartFile lastFrameFile = createMultipartFileFromBytes(lastFrameImage, "last_frame.jpg");
+                return generateSectionVideoWithImageReactive(currentSection.getScript(), lastFrameFile);
+            })
+            .flatMap(sectionVideoBytes -> {
+                log.info("섹션 {} 영상 생성 완료 - 크기: {} bytes", currentSection.getSectionNumber(), sectionVideoBytes.length);
+                
+                List<byte[]> updatedVideos = new ArrayList<>(completedVideos);
+                updatedVideos.add(sectionVideoBytes);
+                
+                // 다음 섹션 처리
+                return generateRemainingVideos(sections, currentIndex + 1, updatedVideos, sectionVideoBytes);
+            });
     }
     
     private byte[] generateSectionVideo(String textPrompt) throws Exception {
@@ -359,6 +434,63 @@ public class VideoGenerationServiceImpl implements VideoGenerationService {
         }
         
         throw new RuntimeException("영상 생성 시간 초과 - Operation: " + operationName);
+    }
+    
+    private Mono<byte[]> generateSectionVideoReactive(String textPrompt) {
+        // 텍스트 프롬프트로 영상 생성
+        return generateVideo(textPrompt)
+            .flatMap(response -> {
+                if (!response.isResult()) {
+                    return Mono.error(new RuntimeException("섹션 영상 생성 실패: " + response.getMessage()));
+                }
+                
+                String operationName = response.getData().getOperationName();
+                
+                // 영상 생성 완료까지 대기
+                return waitForVideoCompletionReactive(operationName)
+                    .then(downloadVideo(operationName));
+            });
+    }
+    
+    private Mono<byte[]> generateSectionVideoWithImageReactive(String textPrompt, MultipartFile imageFile) {
+        // 이미지와 텍스트 프롬프트로 영상 생성
+        return generateVideoWithImage(textPrompt, imageFile)
+            .flatMap(response -> {
+                if (!response.isResult()) {
+                    return Mono.error(new RuntimeException("섹션 영상 생성 실패: " + response.getMessage()));
+                }
+                
+                String operationName = response.getData().getOperationName();
+                
+                // 영상 생성 완료까지 대기
+                return waitForVideoCompletionReactive(operationName)
+                    .then(downloadVideo(operationName));
+            });
+    }
+    
+    private Mono<Void> waitForVideoCompletionReactive(String operationName) {
+        return Mono.defer(() -> {
+            return getVideoStatus(operationName)
+                .flatMap(statusResponse -> {
+                    if (!statusResponse.isResult()) {
+                        return Mono.error(new RuntimeException("상태 확인 실패: " + statusResponse.getMessage()));
+                    }
+                    
+                    GeminiVideoStatusDto status = statusResponse.getData();
+                    
+                    if (status.isDone()) {
+                        log.info("영상 생성 완료 - Operation: {}", operationName);
+                        return Mono.empty();
+                    }
+                    
+                    log.info("영상 생성 진행 중 - Operation: {}", operationName);
+                    // 1분 대기 후 재시도
+                    return Mono.delay(Duration.ofMinutes(1))
+                        .then(waitForVideoCompletionReactive(operationName));
+                });
+        })
+        .timeout(Duration.ofMinutes(15)) // 최대 15분 대기
+        .onErrorMap(e -> new RuntimeException("영상 생성 시간 초과 - Operation: " + operationName, e));
     }
     
     private byte[] extractLastFrame(byte[] videoBytes) {
