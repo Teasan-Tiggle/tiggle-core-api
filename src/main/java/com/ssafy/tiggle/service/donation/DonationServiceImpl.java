@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructorgit 
+@RequiredArgsConstructor
 public class DonationServiceImpl implements DonationService {
 
     private final FinancialApiService financialApiService;
@@ -47,7 +47,7 @@ public class DonationServiceImpl implements DonationService {
     private final UserCharacterRepository userCharacterRepository;
     private final DonationRankingStore rankingStore;
 
-    private final long LEVEL_AMOUNT = 500;
+    private final long LEVEL_AMOUNT = 100;
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -485,7 +485,7 @@ public class DonationServiceImpl implements DonationService {
         // 레벨 재조정
         if (newExperiencePoints >= LEVEL_AMOUNT) {
             character.setLevel(++level);
-            newExperiencePoints -= LEVEL_AMOUNT;
+            newExperiencePoints = LEVEL_AMOUNT;
         }
         character.setExperiencePoints(newExperiencePoints);
 
