@@ -18,7 +18,7 @@ public class DonationScheduler {
     }
 
     // 매주 일요일 20시 실행
-    @Scheduled(cron = "0 0 20 * * SUN")
+    @Scheduled(cron = "0 0 6 * * MON")
     public void runWeeklyDonation() {
         logger.info("학교 -> 단체 기부 스케줄러");
         donationService.transferDonations();

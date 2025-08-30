@@ -37,7 +37,7 @@ public class WeeklyAutoSavingScheduler {
     private static final DateTimeFormatter YMD = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter WEEK_TAG_FMT = DateTimeFormatter.BASIC_ISO_DATE; // yyyyMMdd (월요일 기준)
 
-    @Scheduled(cron = "0 0 18 ? * SUN", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0 1 ? * MON", zone = "Asia/Seoul")
     @Transactional
     public void runWeeklyChangeSweep() {
         log.info("[WeeklyAutoSaving] START (KST now={})", ZonedDateTime.now(KST));
@@ -178,11 +178,15 @@ public class WeeklyAutoSavingScheduler {
                                 }
 
                                 // 4) 저금통 반영 (쓰기 작업은 별도 스레드에서)
-                                return Mono.fromCallable(() -> {
-                                            piggyBankWriterService.applyTiggle(owner.getId(), BigDecimal.valueOf(amount));
-                                            return true;
-                                        })
+                                return Mono.fromCallable(() ->
+                                                piggyBankWriterService.applyTiggle(owner.getId(), BigDecimal.valueOf(amount))
+                                        )
                                         .subscribeOn(Schedulers.boundedElastic())
+                                        .doOnNext(readyNow -> {
+                                            if (readyNow) {
+                                                log.info("[WeeklyAutoSaving] userId={} 목표금액 달성(donation_ready=ON)", owner.getId());
+                                            }
+                                        })
                                         .then();
                             });
                 });

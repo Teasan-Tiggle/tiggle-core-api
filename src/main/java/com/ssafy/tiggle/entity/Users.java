@@ -47,4 +47,7 @@ public class Users {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", nullable = false)
     private Department department;
+
+    @Column(name = "donation_ready", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private boolean donationReady;
 }

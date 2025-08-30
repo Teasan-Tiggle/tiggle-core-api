@@ -38,4 +38,15 @@ public interface PiggyBankRepository extends JpaRepository<PiggyBank, Long> {
        and p.currentAmount >= :amount
     """)
     int applyDonation(@Param("piggyId") Long piggyId, @Param("amount") BigDecimal amount);
+
+    @EntityGraph(attributePaths = {"owner", "owner.university", "esgCategory"})
+    @Query("""
+       select p from PiggyBank p
+         join p.owner o
+        where p.autoDonation = true
+          and o.donationReady = true
+          and p.accountNo is not null and p.accountNo <> ''
+          and p.currentAmount >= p.targetAmount
+    """)
+    List<PiggyBank> findAllReadyToDonate();
 }
