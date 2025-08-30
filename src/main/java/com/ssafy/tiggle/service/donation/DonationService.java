@@ -36,4 +36,7 @@ public interface DonationService {
 
     @Transactional(readOnly = true)
     void updateRankingCache();
+
+    @Transactional
+    CharacterLevel useHeart(Long userId);
 }

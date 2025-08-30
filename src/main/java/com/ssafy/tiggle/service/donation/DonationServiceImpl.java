@@ -7,10 +7,7 @@ import com.ssafy.tiggle.dto.donation.response.*;
 import com.ssafy.tiggle.entity.*;
 import com.ssafy.tiggle.exception.GlobalExceptionHandler;
 import com.ssafy.tiggle.exception.donation.DonationException;
-import com.ssafy.tiggle.repository.donation.DonationHistoryRepository;
-import com.ssafy.tiggle.repository.donation.DonationOrganizationRepository;
-import com.ssafy.tiggle.repository.donation.RankingProjection;
-import com.ssafy.tiggle.repository.donation.SummaryProjection;
+import com.ssafy.tiggle.repository.donation.*;
 import com.ssafy.tiggle.repository.esg.EsgCategoryRepository;
 import com.ssafy.tiggle.repository.university.UniversityRepository;
 import com.ssafy.tiggle.repository.user.StudentRepository;
@@ -47,7 +44,10 @@ public class DonationServiceImpl implements DonationService {
     private final DonationOrganizationRepository donationOrganizationRepository;
     private final EsgCategoryRepository esgCategoryRepository;
     private final UniversityRepository universityRepository;
+    private final UserCharacterRepository userCharacterRepository;
     private final DonationRankingStore rankingStore;
+
+    private final int LEVEL_AMOUNT = 500;
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -186,6 +186,12 @@ public class DonationServiceImpl implements DonationService {
 
                                         logger.info("기부하기 성공");
 
+                                        // 7. 하트 지급
+                                        UserCharacter character = userCharacterRepository.findByUserId(userId)
+                                                .orElseThrow(() -> new IllegalArgumentException("캐릭터가 존재하지 않습니다."));
+                                        character.addHeart(request.getAmount());
+                                        userCharacterRepository.save(character);
+
                                         return ApiResponse.success();
                                     }).subscribeOn(Schedulers.boundedElastic())
                             );
@@ -281,19 +287,26 @@ public class DonationServiceImpl implements DonationService {
     @Override
     public DonationGrowthLevel getDonationGrowthLevel(Long userId) {
 
-        final int LEVEL_AMOUNT = 5_000;
+        UserCharacter userCharacter = userCharacterRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("캐릭터가 존재하지 않습니다."));
 
-        // 1. 총 기부금액 조회
+        // 총 기부금액 조회
         BigDecimal totalAmountBD = donationHistoryRepository.findTotalAmountByUserId(userId);
         long totalAmount = totalAmountBD != null ? totalAmountBD.longValue() : 0L;
 
-        // 2. 레벨 계산
-        int level = (int) (totalAmount / LEVEL_AMOUNT);
+        // 경험치
+        long experiencePoints = userCharacter.getExperiencePoints();
 
-        // 3. 다음 레벨까지 남은 금액
-        long toNextLevel = LEVEL_AMOUNT - (totalAmount % LEVEL_AMOUNT);
+        // 하트
+        Integer heart = userCharacter.getHeart();
 
-        return new DonationGrowthLevel(totalAmount, toNextLevel, level);
+        // 레벨 계산 (경험치에서 계산)
+        int level = userCharacter.getLevel();
+
+        // 다음 레벨까지 남은 경험치
+        long toNextLevel = LEVEL_AMOUNT - (experiencePoints % LEVEL_AMOUNT);
+
+        return new DonationGrowthLevel(totalAmount, experiencePoints, toNextLevel, level, heart);
     }
 
     @Override
@@ -451,5 +464,36 @@ public class DonationServiceImpl implements DonationService {
         for (University uni : universities) {
             rankingStore.saveDepartmentRanking(uni.getId(), donationHistoryRepository.sumByDepartment(uni.getId()));
         }
+    }
+
+
+    @Transactional
+    @Override
+    public CharacterLevel useHeart(Long userId) {
+
+        UserCharacter character = userCharacterRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("캐릭터가 존재하지 않습니다."));
+
+        Long newExperiencePoints = character.getExperiencePoints() + 100;
+        Integer level = character.getLevel();
+        Integer heart = character.getHeart();
+
+        if (character.getHeart() < 1) {
+            throw new IllegalArgumentException("하트 부족!");
+        }
+
+        // 하트 감소 & 경험치 증가
+        character.setHeart(--heart);
+        character.setExperiencePoints(newExperiencePoints);
+
+        // 레벨 재조정
+        if (level <= newExperiencePoints / LEVEL_AMOUNT) {
+            character.setLevel(++level);
+        }
+
+        // 다음 레벨까지 남은 경험치
+        long toNextLevel = LEVEL_AMOUNT - (newExperiencePoints % LEVEL_AMOUNT);
+
+        return new CharacterLevel(newExperiencePoints, toNextLevel, level, heart);
     }
 }
