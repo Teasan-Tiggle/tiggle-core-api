@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
+@RequiredArgsConstructorgit 
 public class DonationServiceImpl implements DonationService {
 
     private final FinancialApiService financialApiService;
@@ -141,7 +141,7 @@ public class DonationServiceImpl implements DonationService {
                                 }
 
                                 // 4. 싸피 금융 API - 계좌이체 실행
-                                return financialApiService.updateDemandDepositAccountTransfer(userKey, depositAccountNo, user.getName(), request.getAmount().toString(), userAccountNo, request.getCategory().toString())
+                                return financialApiService.updateDemandDepositAccountTransfer(userKey, depositAccountNo, user.getName(), request.getAmount().toString(), userAccountNo, "[DONATION] " + request.getCategory().toString() + " 기부")
                                         .thenReturn(new Object[]{userKey, user, userAccountNo});
                             });
                 })
