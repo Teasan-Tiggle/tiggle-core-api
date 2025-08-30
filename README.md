@@ -12,6 +12,7 @@
 * **통합 인증**: 이메일 + SMS(CoolSMS) 본인 확인
 * **비밀번호 보안**: BCrypt 해시 저장
 * **JWT 기반**: Access/Refresh 발급으로 **Stateless** 운영
+* **유저키 보안**: AES-512로 유저키를 암호화 및 복호화
 
 ```java
 // SecurityConfig.java (발췌)
@@ -31,8 +32,8 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
 
 ### ❤️ 기부
 
-* **다양한 기부처 선택**, **투명한 내역 관리(DonationHistory)**
-* **주간 정산**(대학/테마별 합산 송금), **랭킹/통계 제공**
+* **ESG 테마로 기부**, **기부한 내역 관리(DonationHistory)**
+* **모금액 현황**(테마별 합산), **랭킹/통계 제공**
 
 ### 💸 더치페이
 
@@ -55,10 +56,6 @@ public enum DutchpayShareStatus { PENDING, PAID }
 public void runWeeklyChangeSweep() { /* autoSaving 사용자 주간 이체 */ }
 ```
 
-### 🔔 알림
-
-* FCM으로 **더치페이/기부/목표 달성** 등 주요 이벤트 실시간 푸시
-
 ---
 
 ## ⏰ 스케줄러 (개요)
@@ -70,13 +67,13 @@ public void runWeeklyChangeSweep() { /* autoSaving 사용자 주간 이체 */ }
 
 2. **WeeklyUniversityDonationScheduler** — *월요일 02:00 KST*
 
-   * 목표 달성 + 자동기부 ON 사용자 금액을 **대학 테마 계좌로 합산 송금**
+   * 목표 달성 + 자동기부 ON 사용자의 달성 금액을 **대학 테마 계좌로 합산 송금**
    * `donation_ready=1→0` **슬롯 선점(UPDATE)** 로 중복 처리 방지
-   * 처리 결과 **파일 로깅**, 실패 시 플래그 복구로 **다음 주기 재시도**
+   * 처리 결과 **파일 로깅**을 통한 **데이터 정합성 보장**
 
 3. **DonationScheduler** — *월요일 06:00 KST*
 
-   * 주중 모인 금액 기부 단체로 **최종 송금**
+   * 주중 모인 금액을 학교 계좌에서 기부 단체로 **최종 송금**
 
 ---
 
@@ -84,7 +81,7 @@ public void runWeeklyChangeSweep() { /* autoSaving 사용자 주간 이체 */ }
 
 ### 1) 안전한 이체 파이프라인 (리액티브)
 
-* DB 조회 → **잔액 확인(WebClient)** → **이체(WebClient)** → **성공 시에만 원장 기록**
+* 계좌번호 조회 → **잔액 확인(WebClient)** → **이체(WebClient)** → **내역 조회(WebClient)** → **성공 시에만 원장 기록**
 * 이체 실패 시 **DB 미기록**으로 정합성 유지
 
 ```java
