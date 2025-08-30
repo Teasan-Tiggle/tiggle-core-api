@@ -47,7 +47,7 @@ public class DonationServiceImpl implements DonationService {
     private final UserCharacterRepository userCharacterRepository;
     private final DonationRankingStore rankingStore;
 
-    private final int LEVEL_AMOUNT = 500;
+    private final long LEVEL_AMOUNT = 500;
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -300,13 +300,10 @@ public class DonationServiceImpl implements DonationService {
         // 하트
         Integer heart = userCharacter.getHeart();
 
-        // 레벨 계산 (경험치에서 계산)
+        // 레벨
         int level = userCharacter.getLevel();
 
-        // 다음 레벨까지 남은 경험치
-        long toNextLevel = LEVEL_AMOUNT - (experiencePoints % LEVEL_AMOUNT);
-
-        return new DonationGrowthLevel(totalAmount, experiencePoints, toNextLevel, level, heart);
+        return new DonationGrowthLevel(totalAmount, experiencePoints, LEVEL_AMOUNT, level, heart);
     }
 
     @Override
@@ -484,16 +481,14 @@ public class DonationServiceImpl implements DonationService {
 
         // 하트 감소 & 경험치 증가
         character.setHeart(--heart);
-        character.setExperiencePoints(newExperiencePoints);
 
         // 레벨 재조정
-        if (level <= newExperiencePoints / LEVEL_AMOUNT) {
+        if (newExperiencePoints >= LEVEL_AMOUNT) {
             character.setLevel(++level);
+            newExperiencePoints -= LEVEL_AMOUNT;
         }
+        character.setExperiencePoints(newExperiencePoints);
 
-        // 다음 레벨까지 남은 경험치
-        long toNextLevel = LEVEL_AMOUNT - (newExperiencePoints % LEVEL_AMOUNT);
-
-        return new CharacterLevel(newExperiencePoints, toNextLevel, level, heart);
+        return new CharacterLevel(newExperiencePoints, LEVEL_AMOUNT, level, heart);
     }
 }
