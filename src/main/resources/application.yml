@@ -1,6 +1,11 @@
 spring:
   jackson:
     time-zone: Asia/Seoul
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
   
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
@@ -73,6 +78,9 @@ external-api:
     base-url: ${OPENAI_API_BASE_URL}
     api-key: ${OPENAI_API_KEY}
     model: ${OPENAI_API_MODEL}
+  gemini:
+    api-key: ${GEMINI_API_KEY}
+    base-url: ${GEMINI_API_BASE_URL}
 
 # Management 설정
 management:
@@ -94,15 +102,3 @@ jwt:
 # Firebase 설정
 firebase:
   credentials: ${FIREBASE_CREDENTIALS}
-
-# Google TTS 설정
-google:
-  cloud:
-    text-to-speech:
-      project-id: ${GOOGLE_PROJECT_ID}
-      credentials: ${GOOGLE_CREDENTIALS}
-  # Google Veo 3 Video Generation 설정
-  genai:
-    project-id: ${GOOGLE_PROJECT_ID}
-    location: ${GOOGLE_GENAI_LOCATION:us-central1}
-    credentials: ${GOOGLE_CREDENTIALS}

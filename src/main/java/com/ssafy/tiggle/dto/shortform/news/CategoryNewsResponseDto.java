@@ -1,4 +1,4 @@
-package com.ssafy.tiggle.dto.news;
+package com.ssafy.tiggle.dto.shortform.news;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
