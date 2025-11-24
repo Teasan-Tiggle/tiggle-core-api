@@ -3,6 +3,7 @@ name: backend-ci-cd
 on:
   push:
     branches: [ develop, master ]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -57,7 +58,7 @@ jobs:
 
   deploy:
     needs: build-and-push
-    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       IMAGE: ghcr.io/teasan-tiggle/tiggle-core-api
