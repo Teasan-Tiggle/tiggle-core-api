@@ -1,4 +1,4 @@
-package com.ssafy.tiggle.controller;
+package com.ssafy.tiggle.controller.shortform;
 
 import com.ssafy.tiggle.dto.common.ApiResponse;
 import com.ssafy.tiggle.dto.shortform.VideoResponseDto;
