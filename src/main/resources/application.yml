@@ -71,20 +71,27 @@ sms:
   ttl-seconds: ${OTP_TTL_SECONDS:180}
   resend-interval-seconds: ${OTP_RESEND_SECONDS:60}
   max-attempts: ${OTP_MAX_ATTEMPTS:5}
-  mock: ${SMS_MOCK:false}
+  mock: ${SMS_MOCK:true}
 
 # External API 설정
 external-api:
   ssafy:
-    base-url: ${SSAFY_API_BASE_URL}
-    api-key: ${SSAFY_API_KEY}
+    base-url: ${SSAFY_API_BASE_URL:http://localhost:8080}
+    api-key: ${SSAFY_API_KEY:dummy-key}
   openai:
-    base-url: ${OPENAI_API_BASE_URL}
-    api-key: ${OPENAI_API_KEY}
-    model: ${OPENAI_API_MODEL}
+    base-url: ${OPENAI_API_BASE_URL:https://api.openai.com/v1}
+    api-key: ${OPENAI_API_KEY:dummy-key}
+    model: ${OPENAI_API_MODEL:gpt-3.5-turbo}
   gemini:
-    api-key: ${GEMINI_API_KEY}
-    base-url: ${GEMINI_API_BASE_URL}
+    api-key: ${GEMINI_API_KEY:dummy-key}
+    base-url: ${GEMINI_API_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+
+# Feature Flags (기능 활성화/비활성화)
+features:
+  ai-generation:
+    enabled: ${ENABLE_AI_GENERATION:false}  # OpenAI + Gemini 기능
+  sms:
+    enabled: ${ENABLE_SMS:false}  # SMS 실제 발송 기능
 
 # Management 설정
 management:

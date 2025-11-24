@@ -1,6 +1,7 @@
 package com.ssafy.tiggle.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -53,6 +54,7 @@ public class WebClientConfig {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "features.ai-generation.enabled", havingValue = "true", matchIfMissing = false)
     public WebClient generateAiApiWebClient() {
         HttpClient httpClient = HttpClient.create()
                 .responseTimeout(Duration.ofSeconds(30))
@@ -67,6 +69,7 @@ public class WebClientConfig {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "features.ai-generation.enabled", havingValue = "true", matchIfMissing = false)
     public WebClient geminiApiWebClient() {
         HttpClient httpClient = HttpClient.create()
                 .responseTimeout(Duration.ofMinutes(2)) // Gemini API는 비디오 생성시 시간이 오래 걸릴 수 있음

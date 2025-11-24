@@ -6,6 +6,7 @@ import com.ssafy.tiggle.dto.common.ApiResponse;
 import com.ssafy.tiggle.dto.shortform.script.VideoSectionDto;
 import com.ssafy.tiggle.dto.shortform.video.GeminiVideoGenerationDto;
 import com.ssafy.tiggle.dto.shortform.video.GeminiVideoStatusDto;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import ws.schild.jave.Encoder;
 import ws.schild.jave.MultimediaObject;
@@ -17,7 +18,9 @@ import net.bramp.ffmpeg.FFmpeg;
 import net.bramp.ffmpeg.FFmpegExecutor;
 import net.bramp.ffmpeg.FFprobe;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -37,12 +40,23 @@ public class VideoGenerationServiceImpl implements VideoGenerationService {
     private FFmpeg ffmpeg;
     private FFprobe ffprobe;
 
+    @Value("${features.ai-generation.enabled:false}")
+    private boolean aiGenerationEnabled;
+
     private static final String GEMINI_VIDEO_MODEL = "veo-3.0-fast-generate-preview";
-    
-    public VideoGenerationServiceImpl(@Qualifier("geminiApiWebClient") WebClient geminiWebClient) {
+
+    public VideoGenerationServiceImpl(@Autowired(required = false) @Qualifier("geminiApiWebClient") WebClient geminiWebClient) {
         this.geminiWebClient = geminiWebClient;
-        initializeFFmpeg();
-        log.info("Gemini Video Generation API 초기화 완료");
+    }
+
+    @PostConstruct
+    public void init() {
+        if (aiGenerationEnabled && geminiWebClient != null) {
+            initializeFFmpeg();
+            log.info("Gemini Video Generation API 초기화 완료");
+        } else {
+            log.info("Gemini Video Generation API 비활성화 (features.ai-generation.enabled=false)");
+        }
     }
     
     private void initializeFFmpeg() {
@@ -61,15 +75,20 @@ public class VideoGenerationServiceImpl implements VideoGenerationService {
 
     @Override
     public Mono<ApiResponse<GeminiVideoGenerationDto>> generateVideo(String textPrompt) {
+        if (!aiGenerationEnabled || geminiWebClient == null) {
+            log.warn("AI 생성 기능이 비활성화되어 있습니다. features.ai-generation.enabled=true로 설정하고 GEMINI_API_KEY를 제공해주세요.");
+            return Mono.just(ApiResponse.failure("AI 생성 기능이 현재 비활성화되어 있습니다. 관리자에게 문의하세요."));
+        }
+
         log.info("Gemini 비디오 생성 시작 - 프롬프트 길이: {} 문자", textPrompt.length());
-        
+
         // 요청 본문 구성
         Map<String, Object> requestBody = Map.of(
             "instances", Collections.singletonList(Map.of(
                 "prompt", textPrompt
             ))
         );
-        
+
         // REST API 호출
         return geminiWebClient.post()
                 .uri("/models/" + GEMINI_VIDEO_MODEL + ":predictLongRunning")
@@ -100,6 +119,11 @@ public class VideoGenerationServiceImpl implements VideoGenerationService {
 
     @Override
     public Mono<ApiResponse<GeminiVideoGenerationDto>> generateVideoWithImage(String textPrompt, MultipartFile imageFile) {
+        if (!aiGenerationEnabled || geminiWebClient == null) {
+            log.warn("AI 생성 기능이 비활성화되어 있습니다. features.ai-generation.enabled=true로 설정하고 GEMINI_API_KEY를 제공해주세요.");
+            return Mono.just(ApiResponse.failure("AI 생성 기능이 현재 비활성화되어 있습니다. 관리자에게 문의하세요."));
+        }
+
         return Mono.fromCallable(() -> {
             try {
                 log.info("Gemini 이미지 기반 비디오 생성 시작 - 프롬프트 길이: {} 문자, 이미지 파일명: {}, 크기: {} bytes", 
@@ -154,8 +178,13 @@ public class VideoGenerationServiceImpl implements VideoGenerationService {
 
     @Override
     public Mono<ApiResponse<GeminiVideoStatusDto>> getVideoStatus(String operationName) {
+        if (!aiGenerationEnabled || geminiWebClient == null) {
+            log.warn("AI 생성 기능이 비활성화되어 있습니다.");
+            return Mono.just(ApiResponse.failure("AI 생성 기능이 현재 비활성화되어 있습니다."));
+        }
+
         log.debug("Gemini 비디오 상태 확인 시작 - Operation Name: {}", operationName);
-        
+
         // REST API 호출
         return geminiWebClient.get()
                 .uri("/" + operationName)
@@ -228,8 +257,13 @@ public class VideoGenerationServiceImpl implements VideoGenerationService {
 
     @Override
     public Mono<byte[]> downloadVideo(String operationName) {
+        if (!aiGenerationEnabled || geminiWebClient == null) {
+            log.warn("AI 생성 기능이 비활성화되어 있습니다.");
+            return Mono.error(new RuntimeException("AI 생성 기능이 현재 비활성화되어 있습니다."));
+        }
+
         log.info("Gemini 비디오 다운로드 시작 - Operation Name: {}", operationName);
-        
+
         // 먼저 operation 상태를 확인하여 비디오 URI를 얻음
         return geminiWebClient.get()
                 .uri("/" + operationName)
@@ -310,10 +344,15 @@ public class VideoGenerationServiceImpl implements VideoGenerationService {
 
     @Override
     public Mono<ApiResponse<byte[]>> generateFullVideoFromSections(List<VideoSectionDto> sections) {
+        if (!aiGenerationEnabled || geminiWebClient == null) {
+            log.warn("AI 생성 기능이 비활성화되어 있습니다. features.ai-generation.enabled=true로 설정하고 GEMINI_API_KEY를 제공해주세요.");
+            return Mono.just(ApiResponse.failure("AI 생성 기능이 현재 비활성화되어 있습니다. 관리자에게 문의하세요."));
+        }
+
         if (sections.isEmpty()) {
             return Mono.just(ApiResponse.failure("생성할 섹션이 없습니다."));
         }
-        
+
         log.info("풀 영상 생성 시작 - 총 {} 섹션", sections.size());
         
         // 첫 번째 섹션부터 순차적으로 처리
@@ -670,6 +709,11 @@ public class VideoGenerationServiceImpl implements VideoGenerationService {
     
     @Override
     public Mono<byte[]> extractVideoLastFrame(String operationName) {
+        if (!aiGenerationEnabled || geminiWebClient == null) {
+            log.warn("AI 생성 기능이 비활성화되어 있습니다.");
+            return Mono.error(new RuntimeException("AI 생성 기능이 현재 비활성화되어 있습니다."));
+        }
+
         return Mono.fromCallable(() -> {
             try {
                 log.info("비디오 마지막 프레임 추출 시작 - Operation: {}", operationName);

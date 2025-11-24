@@ -3,14 +3,15 @@ package com.ssafy.tiggle.service.shortform;
 import com.ssafy.tiggle.dto.common.ApiResponse;
 import com.ssafy.tiggle.dto.shortform.VideoResponseDto;
 import com.ssafy.tiggle.dto.shortform.news.CategoryNewsResponseDto;
-import com.ssafy.tiggle.entity.EsgCategory;
 import com.ssafy.tiggle.entity.Video;
 import com.ssafy.tiggle.service.shortform.news.NewsCrawlerService;
 import com.ssafy.tiggle.service.shortform.script.ScriptGenerationService;
 import com.ssafy.tiggle.service.shortform.video.VideoGenerationService;
 import com.ssafy.tiggle.service.shortform.video.VideoService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -21,16 +22,34 @@ import java.util.Random;
 @RequiredArgsConstructor
 @Slf4j
 public class ShortFormPipelineService {
-    
+
     private final NewsCrawlerService newsCrawlerService;
     private final ScriptGenerationService scriptGenerationService;
     private final VideoGenerationService videoGenerationService;
     private final VideoService videoService;
     private final Random random = new Random();
-    
+
+    @Value("${features.ai-generation.enabled:false}")
+    private boolean aiGenerationEnabled;
+
+    @PostConstruct
+    public void init() {
+        if (aiGenerationEnabled) {
+            log.info("ShortForm Pipeline API 초기화 완료");
+        } else {
+            log.info("ShortForm Pipeline API 비활성화 (features.ai-generation.enabled=false)");
+        }
+    }
+
+
     public Mono<ApiResponse<VideoResponseDto>> generateShortFormVideoFromNews(String title, String body) {
+        if (!aiGenerationEnabled) {
+            log.warn("AI 생성 기능이 비활성화되어 있습니다. features.ai-generation.enabled=true로 설정해주세요.");
+            return Mono.just(ApiResponse.failure("AI 생성 기능이 현재 비활성화되어 있습니다. 관리자에게 문의하세요."));
+        }
+
         log.info("사용자 입력 뉴스로 숏폼 비디오 생성 시작 - title: {}", title);
-        
+
         // 스크립트 생성
         return scriptGenerationService.generateShortFormVideoScript(title, body)
             .flatMap(scriptResponse -> {
@@ -71,6 +90,11 @@ public class ShortFormPipelineService {
     }
     
     public Mono<ApiResponse<VideoResponseDto>> generateShortFormVideo() {
+        if (!aiGenerationEnabled) {
+            log.warn("AI 생성 기능이 비활성화되어 있습니다. features.ai-generation.enabled=true로 설정해주세요.");
+            return Mono.just(ApiResponse.failure("AI 생성 기능이 현재 비활성화되어 있습니다. 관리자에게 문의하세요."));
+        }
+
         return newsCrawlerService.crawlAllCategoryHeadlines()
             .flatMap(newsListResponse -> {
                 if (!newsListResponse.isResult() || newsListResponse.getData().isEmpty()) {

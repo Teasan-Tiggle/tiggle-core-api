@@ -2,8 +2,10 @@ package com.ssafy.tiggle.service.shortform.script;
 
 import com.ssafy.tiggle.dto.common.ApiResponse;
 import com.ssafy.tiggle.dto.shortform.script.VideoSectionDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -17,42 +19,59 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Slf4j
 @Service
 public class ScriptGenerationServiceImpl implements ScriptGenerationService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ScriptGenerationServiceImpl.class);
     private final WebClient openAiWebClient;
 
     @Value("${external-api.openai.model}")
     private String model;
 
-    public ScriptGenerationServiceImpl(WebClient generateAiApiWebClient) {
+    @Value("${features.ai-generation.enabled:false}")
+    private boolean aiGenerationEnabled;
+
+    public ScriptGenerationServiceImpl(@Autowired(required = false) @Qualifier("generateAiApiWebClient") WebClient generateAiApiWebClient) {
         this.openAiWebClient = generateAiApiWebClient;
+    }
+
+    @PostConstruct
+    public void init() {
+        if (aiGenerationEnabled && openAiWebClient != null) {
+            log.info("OpenAI Script Generation API 초기화 완료");
+        } else {
+            log.info("OpenAI Script Generation API 비활성화 (features.ai-generation.enabled=false)");
+        }
     }
 
     @Override
     public Mono<ApiResponse<List<VideoSectionDto>>> generateShortFormVideoScript(String title, String body) {
-        logger.info("숏폼 영상 스크립트 생성 시작 - title: {}", title);
+        if (!aiGenerationEnabled || openAiWebClient == null) {
+            log.warn("AI 생성 기능이 비활성화되어 있습니다. features.ai-generation.enabled=true로 설정하고 OPENAI_API_KEY를 제공해주세요.");
+            return Mono.just(ApiResponse.failure("AI 생성 기능이 현재 비활성화되어 있습니다. 관리자에게 문의하세요."));
+        }
+
+        log.info("숏폼 영상 스크립트 생성 시작 - title: {}", title);
 
         String prompt = createShortFormVideoPrompt(title, body);
         return generateResponse(prompt)
                 .map(script -> {
-                    logger.info("숏폼 영상 스크립트 생성 완료 - length: {}", script.length());
+                    log.info("숏폼 영상 스크립트 생성 완료 - length: {}", script.length());
                     List<VideoSectionDto> sections = parseScriptToSections(script);
-                    logger.info("스크립트 파싱 완료 - {} 섹션", sections.size());
+                    log.info("스크립트 파싱 완료 - {} 섹션", sections.size());
                     return ApiResponse.success(sections);
                 })
                 .onErrorResume(error -> {
-                    logger.error("숏폼 영상 스크립트 생성 실패", error);
+                    log.error("숏폼 영상 스크립트 생성 실패", error);
                     return Mono.just(ApiResponse.failure("스크립트 생성 중 오류가 발생했습니다: " + error.getMessage()));
                 });
     }
 
     private Mono<String> generateResponse(String prompt) {
-        logger.info("OpenAI API 호출 시작 - prompt: {}", prompt);
+        log.info("OpenAI API 호출 시작 - prompt: {}", prompt);
 
         Object requestBody = createRequestBody(prompt);
-        logger.debug("Request body: {}", requestBody);
+        log.debug("Request body: {}", requestBody);
 
         return openAiWebClient.post()
                 .uri("/v1/chat/completions")
@@ -62,30 +81,30 @@ public class ScriptGenerationServiceImpl implements ScriptGenerationService {
                 .retryWhen(Retry.backoff(3, Duration.ofSeconds(1))
                         .filter(throwable -> {
                             if (throwable instanceof WebClientResponseException.TooManyRequests) {
-                                logger.warn("OpenAI API 사용량 제한 - 재시도 중...");
+                                log.warn("OpenAI API 사용량 제한 - 재시도 중...");
                                 return true;
                             }
                             return false;
                         })
                         .onRetryExhaustedThrow((retryBackoffSpec, retrySignal) -> {
-                            logger.error("OpenAI API 재시도 횟수 초과");
+                            log.error("OpenAI API 재시도 횟수 초과");
                             return new RuntimeException("OpenAI API 사용량 제한으로 인해 요청 실패", retrySignal.failure());
                         }))
                 .doOnError(error -> {
                     if (error instanceof WebClientResponseException.TooManyRequests) {
-                        logger.error("OpenAI API 사용량 제한 초과 - 나중에 다시 시도해주세요");
+                        log.error("OpenAI API 사용량 제한 초과 - 나중에 다시 시도해주세요");
                     } else {
-                        logger.error("OpenAI API 호출 실패", error);
+                        log.error("OpenAI API 호출 실패", error);
                     }
                 })
-                .doOnNext(response -> logger.debug("OpenAI API 응답: {}", response))
+                .doOnNext(response -> log.debug("OpenAI API 응답: {}", response))
                 .map(response -> {
                     if (response.choices() == null || response.choices().length == 0) {
-                        logger.error("OpenAI API 응답에 choices가 없습니다");
+                        log.error("OpenAI API 응답에 choices가 없습니다");
                         throw new RuntimeException("잘못된 OpenAI API 응답");
                     }
                     String content = response.choices()[0].message().content();
-                    logger.info("OpenAI API 호출 완료 - response length: {}", content.length());
+                    log.info("OpenAI API 호출 완료 - response length: {}", content.length());
                     return content;
                 })
                 .onErrorMap(error -> {
@@ -175,7 +194,7 @@ public class ScriptGenerationServiceImpl implements ScriptGenerationService {
                 1000,
                 0.7
         );
-        logger.debug("생성된 요청 - model: {}, max_tokens: {}, temperature: {}",
+        log.debug("생성된 요청 - model: {}, max_tokens: {}, temperature: {}",
                 model, 1000, 0.7);
         return request;
     }
@@ -221,7 +240,7 @@ public class ScriptGenerationServiceImpl implements ScriptGenerationService {
         
         // 섹션이 파싱되지 않은 경우 전체 스크립트를 하나의 섹션으로 처리
         if (sections.isEmpty()) {
-            logger.warn("섹션 파싱 실패 - 전체 스크립트를 섹션 1로 처리");
+            log.warn("섹션 파싱 실패 - 전체 스크립트를 섹션 1로 처리");
             sections.add(new VideoSectionDto(1, script.trim()));
         }
         
