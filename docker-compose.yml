@@ -1,0 +1,19 @@
+services:
+  app:
+    image: ${APP_IMAGE:-ghcr.io/teasan-tiggle/tiggle-core-api:latest}
+    container_name: tiggle-api
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Seoul
+      - JAVA_OPTS=-Xms512m -Xmx1024m -Duser.timezone=Asia/Seoul
+    networks:
+      - yeobaek-network
+
+networks:
+  yeobaek-network:
+    external: true
+    name: yeobaek_yeobaek-network
