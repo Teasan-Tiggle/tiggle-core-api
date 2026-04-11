@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: "optional:file:tiggle.env[.properties]"
   jackson:
     time-zone: Asia/Seoul
 
